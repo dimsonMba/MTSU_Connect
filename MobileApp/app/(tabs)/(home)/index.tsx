@@ -151,7 +151,7 @@ export default function HomeScreen() {
             <Text style={styles.avatarText}>
               {displayName
                 .split(" ")
-                .map((n) => n[0])
+                .map((n: string) => n[0])
                 .join("")}
             </Text>
           </View>
