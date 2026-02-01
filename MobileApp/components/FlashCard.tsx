@@ -143,11 +143,11 @@ export function FlashCard({
   });
 
   const frontStyle = {
-    transform: [{ rotateY: frontInterpolate }],
+    transform: [{ perspective: 1000 }, { rotateY: frontInterpolate }],
   };
 
   const backStyle = {
-    transform: [{ rotateY: backInterpolate }],
+    transform: [{ perspective: 1000 }, { rotateY: backInterpolate }],
   };
 
   const leftOpacity = position.x.interpolate({

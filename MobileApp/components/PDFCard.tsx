@@ -2,13 +2,20 @@ import React from "react";
 import { View, Text, StyleSheet, Pressable, Animated } from "react-native";
 import { colors } from "@/constants/colors";
 import { PDFDocument } from "@/types";
-import { FileText, Sparkles, Check, RotateCcw } from "lucide-react-native";
+import {
+  FileText,
+  Sparkles,
+  Check,
+  RotateCcw,
+  MessageCircle,
+} from "lucide-react-native";
 
 interface PDFCardProps {
   document: PDFDocument;
   onGenerateFlashcards?: () => void;
   onRetry?: () => void;
   onPress?: () => void;
+  onAsk?: () => void;
 }
 
 export function PDFCard({
@@ -16,6 +23,7 @@ export function PDFCard({
   onGenerateFlashcards,
   onRetry,
   onPress,
+  onAsk,
 }: PDFCardProps) {
   const scaleAnim = React.useRef(new Animated.Value(1)).current;
 
@@ -38,6 +46,11 @@ export function PDFCard({
     return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
   };
 
+  const pageLabel =
+    typeof document.pageCount === "number" && document.pageCount > 0
+      ? `${document.pageCount} pages`
+      : "Counting pages…";
+
   return (
     <Pressable
       onPress={onPress}
@@ -55,30 +68,40 @@ export function PDFCard({
             {document.title}
           </Text>
           <Text style={styles.meta}>
-            {document.pageCount} pages • {formatDate(document.uploadedAt)}
+            {pageLabel} • {formatDate(document.uploadedAt)}
           </Text>
         </View>
-        {document.hasFlashcards ? (
-          <View style={styles.completedBadge}>
-            <Check size={14} color={colors.success} />
-            <Text style={styles.completedText}>Cards Ready</Text>
-          </View>
-        ) : (
-          <View style={styles.actionsRow}>
-            <Pressable
-              style={styles.generateButton}
-              onPress={onGenerateFlashcards}
-            >
-              <Sparkles size={14} color={colors.white} />
-              <Text style={styles.generateText}>Generate</Text>
-            </Pressable>
-            {onRetry ? (
-              <Pressable style={styles.retryButton} onPress={onRetry}>
-                <RotateCcw size={16} color={colors.primary} />
+        <View style={styles.actionColumn}>
+          {document.hasFlashcards ? (
+            <View style={styles.completedBadge}>
+              <Check size={14} color={colors.success} />
+              <Text style={styles.completedText}>Cards Ready</Text>
+            </View>
+          ) : (
+            <View style={styles.actionsRow}>
+              <Pressable
+                style={styles.generateButton}
+                onPress={onGenerateFlashcards}
+              >
+                <Sparkles size={14} color={colors.white} />
+                <Text style={styles.generateText}>Generate</Text>
               </Pressable>
-            ) : null}
-          </View>
-        )}
+              {onRetry ? (
+                <Pressable style={styles.retryButton} onPress={onRetry}>
+                  <RotateCcw size={16} color={colors.primary} />
+                </Pressable>
+              ) : null}
+            </View>
+          )}
+
+          {onAsk ? (
+            // Quick access into the document-aware chat experience.
+            <Pressable style={styles.askButton} onPress={onAsk}>
+              <MessageCircle size={16} color={colors.primary} />
+              <Text style={styles.askButtonText}>Ask AI</Text>
+            </Pressable>
+          ) : null}
+        </View>
       </Animated.View>
     </Pressable>
   );
@@ -119,6 +142,10 @@ const styles = StyleSheet.create({
   meta: {
     fontSize: 13,
     color: colors.textSecondary,
+  },
+  actionColumn: {
+    alignItems: "flex-end",
+    gap: 8,
   },
   generateButton: {
     flexDirection: "row",
@@ -162,5 +189,21 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "600" as const,
     color: colors.success,
+  },
+  askButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.white,
+  },
+  askButtonText: {
+    fontSize: 13,
+    fontWeight: "600" as const,
+    color: colors.primary,
   },
 });

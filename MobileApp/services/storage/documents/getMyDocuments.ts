@@ -8,8 +8,7 @@ export async function getMyDocuments() {
 
   const { data, error } = await supabase
     .from("documents")
-    // don't select columns that might not exist in every deployment (eg: has_flashcards)
-    .select("id, title, storage_bucket, storage_path, created_at")
+    .select("id, title, storage_bucket, storage_path, created_at, page_count")
     .eq("user_id", user.id)
     .order("created_at", { ascending: false });
 
@@ -19,7 +18,10 @@ export async function getMyDocuments() {
     id: String(row.id),
     title: row.title || "Untitled",
     uploadedAt: row.created_at ? new Date(row.created_at) : new Date(),
-    pageCount: 0, // page_count column may not exist
+    pageCount:
+      typeof row.page_count === "number" && row.page_count > 0
+        ? row.page_count
+        : 0,
     hasFlashcards: false, // has_flashcards column may not exist
   }));
 }

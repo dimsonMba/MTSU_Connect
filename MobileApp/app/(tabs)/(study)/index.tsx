@@ -214,6 +214,12 @@ export default function StudyScreen() {
     }
   };
 
+  const handleAskDocument = (documentId: string) => {
+    // Route into the lightweight ask chat so the user can quiz the document immediately.
+    // Cast keeps TypeScript happy until Expo Router regenerates types for /ask/[documentId].
+    router.push(`/ask/${documentId}` as any);
+  };
+
   const handlePDFPress = (documentId: string) => {
     const pdf = pdfs.find((p) => p.id === documentId);
     if (pdf?.hasFlashcards) {
@@ -337,6 +343,7 @@ export default function StudyScreen() {
             onGenerateFlashcards={() => handleGenerateFlashcards(pdf.id)}
             onRetry={() => handleGenerateFlashcards(pdf.id)}
             onPress={() => handlePDFPress(pdf.id)}
+            onAsk={() => handleAskDocument(pdf.id)}
           />
         ))}
 

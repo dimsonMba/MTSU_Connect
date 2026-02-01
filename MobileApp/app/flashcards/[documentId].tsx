@@ -88,6 +88,8 @@ export default function FlashcardsScreen() {
 
   const isComplete = currentIndex >= cards.length;
   const progress = cards.length > 0 ? (currentIndex / cards.length) * 100 : 0;
+  const visibleCards = cards.slice(currentIndex, currentIndex + 3);
+  const stackedCards = [...visibleCards].reverse();
 
   return (
     <SafeAreaView style={styles.container} edges={["bottom"]}>
@@ -171,29 +173,17 @@ export default function FlashcardsScreen() {
           </View>
         ) : (
           <>
-            {cards
-              .slice(currentIndex, currentIndex + 3)
-              .reverse()
-              .map((card, index) => (
-                <FlashCard
-                  key={card.id}
-                  question={card.question}
-                  answer={card.answer}
-                  onSwipeLeft={
-                    index ===
-                    cards.slice(currentIndex, currentIndex + 3).length - 1
-                      ? handleSwipeLeft
-                      : undefined
-                  }
-                  onSwipeRight={
-                    index ===
-                    cards.slice(currentIndex, currentIndex + 3).length - 1
-                      ? handleSwipeRight
-                      : undefined
-                  }
-                  cardIndex={index}
-                />
-              ))}
+            {stackedCards.map((card, index) => (
+              <FlashCard
+                key={card.id}
+                question={card.question}
+                answer={card.answer}
+                // Only the top-most card (index 0 after reversing) should react to swipes.
+                onSwipeLeft={index === 0 ? handleSwipeLeft : undefined}
+                onSwipeRight={index === 0 ? handleSwipeRight : undefined}
+                cardIndex={index}
+              />
+            ))}
           </>
         )}
       </View>
