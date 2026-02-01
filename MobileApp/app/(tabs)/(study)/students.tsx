@@ -17,9 +17,11 @@ import { studentService, Student } from "@/services/student.service";
 import { chatService } from "@/services/chat.service";
 import { User, Search, MessageCircle, GraduationCap } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
+import { useTheme } from "@/contexts/ThemeContext";
 
 export default function StudentsListScreen() {
   const router = useRouter();
+  const { colors: themeColors } = useTheme();
   const [students, setStudents] = useState<Student[]>([]);
   const [filteredStudents, setFilteredStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);

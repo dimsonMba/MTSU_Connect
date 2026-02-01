@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -6,13 +6,16 @@ import {
   ScrollView,
   TextInput,
   Pressable,
+  Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { colors } from "@/constants/colors";
 import { PDFCard } from "@/components/PDFCard";
 import { StudyPartnerCard } from "@/components/StudyPartnerCard";
 import { AIProgressOverlay } from "@/components/AIProgressOverlay";
-import { mockStudyPartners } from "@/mocks/data";
+import { authService } from "@/services/auth.service";
+import { profileService } from "@/services/profile.service";
+import { chatService } from "@/services/chat.service";
 import { getMyDocuments } from "@/services/storage/documents/getMyDocuments";
 import {
   Search,
@@ -21,11 +24,11 @@ import {
   GraduationCap,
   Sparkles,
   X,
-  MessageCircle,
   Users,
+  MessageCircle,
 } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
-import { Alert } from "react-native";
+import { useTheme } from "@/contexts/ThemeContext";
 import * as DocumentPicker from "expo-document-picker";
 import { createDocument } from "@/services/storage/documents/createDocument";
 import { uploadPdfToStorage } from "@/services/storage/uploadPdf";
@@ -38,6 +41,7 @@ type SearchMode = "pdfs" | "scholar";
 
 export default function StudyScreen() {
   const router = useRouter();
+  const { colors: themeColors } = useTheme();
   const [searchQuery, setSearchQuery] = useState("");
   const [searchMode, setSearchMode] = useState<SearchMode>("pdfs");
   const [isGenerating, setIsGenerating] = useState(false);
@@ -46,6 +50,8 @@ export default function StudyScreen() {
   );
   const [pdfs, setPdfs] = useState<Array<any>>([]);
   const [loadingDocs, setLoadingDocs] = useState(false);
+  const [partners, setPartners] = useState<any[]>([]);
+  const [creatingChat, setCreatingChat] = useState<string | null>(null);
 
   const refreshDocuments = async () => {
     try {
@@ -59,8 +65,31 @@ export default function StudyScreen() {
     }
   };
 
-  React.useEffect(() => {
+  useEffect(() => {
     refreshDocuments();
+  }, []);
+
+  useEffect(() => {
+    const loadPartners = async () => {
+      try {
+        const { user } = await authService.getCurrentUser();
+        if (!user) return;
+
+        const { profiles } = await profileService.getAllProfiles();
+        const otherProfiles = (profiles || [])
+          .filter((p) => p.id !== user.id)
+          .map((p) => ({
+            id: p.id,
+            name: p.full_name || "Student",
+            major: p.major || "Undeclared",
+          }));
+        setPartners(otherProfiles);
+      } catch (err) {
+        console.error("Error loading study partners:", err);
+      }
+    };
+
+    loadPartners();
   }, []);
 
   const handleGenerateFlashcards = async (documentId: string) => {
@@ -82,7 +111,6 @@ export default function StudyScreen() {
         ),
       );
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      // Show a small confirmation and let the user open the flashcards
       Alert.alert(
         "Flashcards ready",
         "Flashcards were generated successfully.",
@@ -107,7 +135,6 @@ export default function StudyScreen() {
     try {
       console.log("handleUploadPdf: start");
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      // Ensure user is authenticated before trying to create/update rows
       const { data: userRes } = await supabase.auth.getUser();
       const user = userRes?.user;
       if (!user || !user.id) {
@@ -122,11 +149,8 @@ export default function StudyScreen() {
       });
       console.log("DocumentPicker result:", res);
 
-      // Handle different runtime shapes. Prefer the documented `type === 'success'` check,
-      // but also support returned objects that include a `uri` field or an `assets` array.
       let pickedUri: string | undefined;
       if (res && typeof res === "object") {
-        // Newer Expo DocumentPicker shape (and some platforms): { assets: [{ uri, name, ... }], canceled: boolean }
         // @ts-ignore
         if (
           Array.isArray(res.assets) &&
@@ -136,7 +160,6 @@ export default function StudyScreen() {
           // @ts-ignore
           pickedUri = res.assets[0].uri;
         } else if ("type" in res) {
-          // Common shape: { type: 'success', uri, name }
           // @ts-ignore
           if (res.type !== "success") {
             Alert.alert("No file selected", "Please pick a PDF to upload.");
@@ -145,7 +168,6 @@ export default function StudyScreen() {
           // @ts-ignore
           pickedUri = res.uri || res.fileUri || res.uri;
         } else {
-          // Fallback: if object has uri, use it
           // @ts-ignore
           pickedUri = res.uri || res.fileUri;
         }
@@ -160,7 +182,6 @@ export default function StudyScreen() {
         return;
       }
 
-      // create DB row
       setIsGenerating(true);
       setGeneratingStage("Creating document record...");
       const title =
@@ -169,7 +190,6 @@ export default function StudyScreen() {
           : "Untitled";
       const { id: documentId, user_id } = await createDocument(title);
 
-      // upload file to storage
       const uri = pickedUri as string;
       console.log("Uploading file URI:", uri);
       setGeneratingStage("Uploading PDF to storage...");
@@ -180,20 +200,16 @@ export default function StudyScreen() {
       });
       await updateDocumentStorage(documentId, uploadRes.bucket, uploadRes.path);
 
-      // Ingest PDF (extract text, chunk, embed) via edge function
       try {
         setGeneratingStage("Ingesting PDF (extracting & embedding)...");
         await ingestPdf(documentId);
       } catch (ingestErr) {
-        // Log but allow fallback to try generating flashcards anyway
         console.warn("ingestPdf failed", ingestErr);
       }
 
-      // Optionally start generation automatically
       setGeneratingStage("Generating flashcards...");
       await generateFlashcards(documentId);
 
-      // refresh list from server so UI stays authoritative
       await refreshDocuments();
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -203,7 +219,6 @@ export default function StudyScreen() {
           ? "Signed URL created (valid 1h)"
           : "Uploaded to storage",
       );
-      console.log("Uploaded file signed URL:", uploadRes.signedUrl);
       router.push(`/flashcards/${documentId}`);
     } catch (err: any) {
       console.warn("Upload PDF failed", err);
@@ -215,8 +230,6 @@ export default function StudyScreen() {
   };
 
   const handleAskDocument = (documentId: string) => {
-    // Route into the lightweight ask chat so the user can quiz the document immediately.
-    // Cast keeps TypeScript happy until Expo Router regenerates types for /ask/[documentId].
     router.push(`/ask/${documentId}` as any);
   };
 
@@ -227,34 +240,55 @@ export default function StudyScreen() {
     }
   };
 
+  const handleConnectToPartner = async (partnerId: string) => {
+    if (creatingChat === partnerId) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setCreatingChat(partnerId);
+
+    const { data, error } = await chatService.createOrGetDirectMessage(partnerId);
+
+    setCreatingChat(null);
+
+    if (error || !data) {
+      console.error("Failed to start chat from study partners:", error);
+      const message =
+        typeof error?.message === "string"
+          ? error.message
+          : "Failed to start chat. Please try again.";
+      Alert.alert("Error", message);
+      return;
+    }
+
+    router.push(`/chat/${data.id}`);
+  };
+
   const filteredPDFs = pdfs.filter((pdf) =>
     pdf.title.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: themeColors.background }]}>
       <ScrollView
-        //style={styles.scrollView}
-        //contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
       >
-        <View style={styles.searchContainer}>
-          <View style={styles.searchBar}>
-            <Search size={20} color={colors.textSecondary} />
+        <View style={[styles.searchContainer, { backgroundColor: themeColors.cardBackground }]}>
+          <View style={[styles.searchBar, { backgroundColor: themeColors.background }]}>
+            <Search size={20} color={themeColors.textSecondary} />
             <TextInput
-              style={styles.searchInput}
+              style={[styles.searchInput, { color: themeColors.text }]}
               placeholder={
                 searchMode === "pdfs"
                   ? "Search your PDFs..."
                   : "Search Google Scholar..."
               }
-              placeholderTextColor={colors.textMuted}
+              placeholderTextColor={themeColors.textMuted}
               value={searchQuery}
               onChangeText={setSearchQuery}
             />
             {searchQuery.length > 0 && (
               <Pressable onPress={() => setSearchQuery("")}>
-                <X size={18} color={colors.textMuted} />
+                <X size={18} color={themeColors.textMuted} />
               </Pressable>
             )}
           </View>
@@ -311,24 +345,18 @@ export default function StudyScreen() {
             style={[styles.actionButton, styles.chatButton]}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              // Push to the sibling route inside the same stack group. Use a
-              // relative route name ("chats") instead of an absolute path
-              // ("/chats") which would look for a top-level /chats route.
               router.push("chats" as any);
             }}
           >
             <MessageCircle size={20} color={colors.white} />
             <Text style={styles.chatButtonText}>Messages</Text>
           </Pressable>
-        </View>
-
-        <View style={styles.actionButtonsRow}>
-          <Pressable style={styles.actionButton} onPress={handleUploadPdf}>
+          <Pressable style={[styles.actionButton, styles.uploadButton]} onPress={handleUploadPdf}>
             <Upload size={20} color={colors.primary} />
             <Text style={styles.uploadText}>Upload PDF</Text>
           </Pressable>
         </View>
-
+        
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Your Documents</Text>
           <View style={styles.countBadge}>
@@ -336,16 +364,20 @@ export default function StudyScreen() {
           </View>
         </View>
 
-        {filteredPDFs.map((pdf) => (
-          <PDFCard
-            key={pdf.id}
-            document={pdf}
-            onGenerateFlashcards={() => handleGenerateFlashcards(pdf.id)}
-            onRetry={() => handleGenerateFlashcards(pdf.id)}
-            onPress={() => handlePDFPress(pdf.id)}
-            onAsk={() => handleAskDocument(pdf.id)}
-          />
-        ))}
+        {filteredPDFs.length === 0 ? (
+          <Text style={styles.emptyText}>No PDFs uploaded yet</Text>
+        ) : (
+          filteredPDFs.map((pdf) => (
+            <PDFCard
+              key={pdf.id}
+              document={pdf}
+              onGenerateFlashcards={() => handleGenerateFlashcards(pdf.id)}
+              onRetry={() => handleGenerateFlashcards(pdf.id)}
+              onPress={() => handlePDFPress(pdf.id)}
+              onAsk={() => handleAskDocument(pdf.id)}
+            />
+          ))
+        )}
 
         <View style={styles.sectionHeader}>
           <View style={styles.sectionTitleRow}>
@@ -357,16 +389,19 @@ export default function StudyScreen() {
           </View>
         </View>
 
-        {mockStudyPartners.map((partner) => (
-          <StudyPartnerCard
-            key={partner.id}
-            partner={partner}
-            onConnect={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              router.push("/chat/new");
-            }}
-          />
-        ))}
+        {partners.length === 0 ? (
+          <Text style={styles.emptyText}>No study partners yet</Text>
+        ) : (
+          partners.map((partner) => (
+            <StudyPartnerCard
+              key={partner.id}
+              partner={partner}
+              onConnect={() => {
+                handleConnectToPartner(partner.id);
+              }}
+            />
+          ))
+        )}
       </ScrollView>
 
       <AIProgressOverlay
@@ -380,10 +415,6 @@ export default function StudyScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
-  },
-  scrollView: {
-    flex: 1,
   },
   scrollContent: {
     padding: 20,
@@ -391,11 +422,14 @@ const styles = StyleSheet.create({
   },
   searchContainer: {
     marginBottom: 20,
+    backgroundColor: colors.white,
+    padding: 12,
+    borderRadius: 16,
   },
   searchBar: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: colors.white,
+    backgroundColor: colors.background,
     borderRadius: 14,
     paddingHorizontal: 16,
     height: 50,
@@ -411,7 +445,7 @@ const styles = StyleSheet.create({
   },
   searchToggle: {
     flexDirection: "row",
-    backgroundColor: colors.white,
+    backgroundColor: colors.background,
     borderRadius: 12,
     padding: 4,
     borderWidth: 1,
@@ -431,7 +465,7 @@ const styles = StyleSheet.create({
   },
   toggleText: {
     fontSize: 14,
-    fontWeight: "500" as const,
+    fontWeight: "500",
     color: colors.textSecondary,
   },
   toggleTextActive: {
@@ -453,40 +487,21 @@ const styles = StyleSheet.create({
   },
   chatButton: {
     backgroundColor: colors.primary,
-    borderWidth: 2,
-    borderColor: colors.primary,
   },
   chatButtonText: {
     fontSize: 16,
-    fontWeight: "600" as const,
-    color: colors.white,
-  },
-  studentsButton: {
-    backgroundColor: colors.primary,
-    borderWidth: 2,
-    borderColor: colors.primary,
-  },
-  studentsButtonText: {
-    fontSize: 16,
-    fontWeight: "600" as const,
+    fontWeight: "600",
     color: colors.white,
   },
   uploadButton: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
     backgroundColor: `${colors.primary}10`,
-    borderRadius: 14,
-    padding: 16,
-    gap: 8,
     borderWidth: 2,
     borderColor: colors.primary,
     borderStyle: "dashed",
   },
   uploadText: {
     fontSize: 16,
-    fontWeight: "600" as const,
+    fontWeight: "600",
     color: colors.primary,
   },
   sectionHeader: {
@@ -502,7 +517,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 20,
-    fontWeight: "700" as const,
+    fontWeight: "700",
     color: colors.text,
   },
   countBadge: {
@@ -514,7 +529,7 @@ const styles = StyleSheet.create({
   },
   countText: {
     fontSize: 13,
-    fontWeight: "600" as const,
+    fontWeight: "600",
     color: colors.white,
   },
   aiBadge: {
@@ -528,7 +543,13 @@ const styles = StyleSheet.create({
   },
   aiBadgeText: {
     fontSize: 11,
-    fontWeight: "600" as const,
+    fontWeight: "600",
     color: colors.primary,
+  },
+  emptyText: {
+    fontSize: 13,
+    color: colors.textMuted,
+    textAlign: "center",
+    paddingVertical: 8,
   },
 });

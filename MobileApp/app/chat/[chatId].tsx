@@ -12,18 +12,22 @@ import {
   Alert,
   Modal,
   ScrollView,
+  AppState,
 } from "react-native";
 import { useLocalSearchParams, Stack, useRouter } from "expo-router";
+import { useFocusEffect } from "@react-navigation/native";
 import { colors } from "@/constants/colors";
 import { ChatBubble } from "@/components/ChatBubble";
 import { chatService, ChatMessage, ChatParticipant } from "@/services/chat.service";
-import { Send, Paperclip, Users, UserPlus } from "lucide-react-native";
+import { ArrowLeft, Send, Paperclip, Users, UserPlus } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
 import { supabase } from "@/lib/supabase";
+import { useTheme } from "@/contexts/ThemeContext";
 
 export default function ChatScreen() {
   const { chatId } = useLocalSearchParams<{ chatId: string }>();
   const router = useRouter();
+  const { colors: themeColors } = useTheme();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [participants, setParticipants] = useState<ChatParticipant[]>([]);
   const [conversationName, setConversationName] = useState("");
@@ -35,6 +39,15 @@ export default function ChatScreen() {
   const [currentUserId, setCurrentUserId] = useState<string>("");
   const [showParticipants, setShowParticipants] = useState(false);
   const flatListRef = useRef<FlatList>(null);
+
+  const handleBack = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace("/(tabs)/(study)");
+    }
+  };
 
   useEffect(() => {
     loadChatData();
@@ -71,6 +84,28 @@ export default function ChatScreen() {
       supabase.removeChannel(messageChannel);
       supabase.removeChannel(participantChannel);
     };
+  }, [chatId, isMember]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      if (!chatId || !isMember) return;
+      chatService.updateOnlineStatus(chatId as string, true);
+      return () => {
+        chatService.updateOnlineStatus(chatId as string, false);
+      };
+    }, [chatId, isMember])
+  );
+
+  useEffect(() => {
+    if (!chatId || !isMember) return;
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") {
+        chatService.updateOnlineStatus(chatId as string, true);
+      } else {
+        chatService.updateOnlineStatus(chatId as string, false);
+      }
+    });
+    return () => subscription.remove();
   }, [chatId, isMember]);
 
   const checkMembership = async () => {
@@ -176,6 +211,11 @@ export default function ChatScreen() {
         <Stack.Screen
           options={{
             title: conversationName || "Study Group",
+            headerLeft: () => (
+              <Pressable onPress={handleBack} style={styles.backButton}>
+                <ArrowLeft size={22} color={colors.primary} />
+              </Pressable>
+            ),
           }}
         />
         <View style={styles.joinContainer}>
@@ -225,6 +265,11 @@ export default function ChatScreen() {
       <Stack.Screen
         options={{
           title: conversationName || "Chat",
+          headerLeft: () => (
+            <Pressable onPress={handleBack} style={styles.backButton}>
+              <ArrowLeft size={22} color={colors.primary} />
+            </Pressable>
+          ),
           headerRight: () => (
             <Pressable 
               style={styles.headerRight}
@@ -461,6 +506,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
+  },
+  backButton: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
   },
   participantsBadge: {
     flexDirection: "row",

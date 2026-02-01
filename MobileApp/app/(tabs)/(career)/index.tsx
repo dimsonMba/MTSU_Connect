@@ -11,8 +11,9 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { colors } from "@/constants/colors";
-import { mockUser } from "@/mocks/data";
 import { ResumeData } from "@/types";
+import { authService } from "@/services/auth.service";
+import { profileService } from "@/services/profile.service";
 import {
   User,
   GraduationCap,
@@ -20,10 +21,12 @@ import {
 } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
 import * as DocumentPicker from "expo-document-picker";
-import { uploadResumePdfToStorage } from "../../lib/storage";
-import { extractResumeText } from "../../lib/api";
-
-
+import { uploadResumePdfToStorage } from "@/lib/storage";
+import { extractResumeText, generateResumeJson } from "@/lib/api";
+import { useTheme } from "@/contexts/ThemeContext";
+import * as Print from "expo-print";
+import * as Sharing from "expo-sharing";
+import { setResumePreviewPayload } from "@/lib/resumePreviewStore";
 
 
 type Step = "personal" | "education";
@@ -44,6 +47,7 @@ const steps: { id: Step; title: string; icon: React.ReactNode }[] = [
 
 export default function CareerScreen() {
   const router = useRouter();
+  const { colors: themeColors } = useTheme();
   const [currentStep, setCurrentStep] = useState<Step>("personal");
   const [jobDescription, setJobDescription] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -55,8 +59,8 @@ export default function CareerScreen() {
   } | null>(null);
   const [resumeData, setResumeData] = useState<ResumeData>({
     personalInfo: {
-      fullName: mockUser.name,
-      email: mockUser.email,
+      fullName: "",
+      email: "",
       phone: "",
       linkedin: "",
       portfolio: "",
@@ -64,15 +68,58 @@ export default function CareerScreen() {
     education: {
       school: "Middle Tennessee State University",
       degree: "Bachelor of Science",
-      major: mockUser.major,
-      gpa: mockUser.gpa.toString(),
+      major: "",
+      gpa: "",
       graduationDate: "May 2024",
     },
     
   });
+  const [resumeLoaded, setResumeLoaded] = useState(false);
 
-  
-  
+  React.useEffect(() => {
+    const loadProfile = async () => {
+      try {
+        const { user } = await authService.getCurrentUser();
+        if (!user || resumeLoaded) return;
+
+        const { profile, error } = await profileService.getProfile(user.id);
+        let resolvedProfile = profile;
+
+        if (error && error.code === "PGRST116") {
+          const { profile: newProfile } = await profileService.createProfile(user.id, {
+            full_name: user.user_metadata?.full_name || null,
+            email: user.email || "",
+          });
+          resolvedProfile = newProfile;
+        }
+
+        setResumeData((prev) => ({
+          ...prev,
+          personalInfo: {
+            ...prev.personalInfo,
+            fullName:
+              resolvedProfile?.full_name ||
+              user.user_metadata?.full_name ||
+              prev.personalInfo.fullName,
+            email: user.email || prev.personalInfo.email,
+          },
+          education: {
+            ...prev.education,
+            major: resolvedProfile?.major || prev.education.major,
+            gpa:
+              resolvedProfile?.gpa !== null && resolvedProfile?.gpa !== undefined
+                ? resolvedProfile.gpa.toFixed(2)
+                : prev.education.gpa,
+          },
+        }));
+        setResumeLoaded(true);
+      } catch (err) {
+        console.error("Error loading resume profile data:", err);
+      }
+    };
+
+    loadProfile();
+  }, [resumeLoaded]);
 
 
   const pickResumePdf = async () => {
@@ -111,10 +158,7 @@ export default function CareerScreen() {
       return;
     }
 
-    console.log("Tailoring resume with AI for job:", jobDescription);
-    console.log("resumeData:", resumeData);
-    console.log("resumeFile:", resumeFile);
-
+  
     try {
       // 1) upload PDF
       const resumePdfPath = await uploadResumePdfToStorage(resumeFile);
@@ -126,7 +170,20 @@ export default function CareerScreen() {
         formData: resumeData,
       });
 
+      //console.log("Extracted text:", extractedText);
       console.log("Extracted text length:", extractedText.length);
+
+      const resume = await generateResumeJson({
+        resumeText: extractedText,
+        formData: resumeData,
+        jobDescription,
+      });
+
+      console.log("Generated HTML:", resume);
+
+      //const { uri } = await Print.printToFileAsync({ html }); // create PDF once here
+
+      setResumePreviewPayload({ resumeJson: resume});
 
       // We wtill need to do the ai implementation with supabase edge functions here
 

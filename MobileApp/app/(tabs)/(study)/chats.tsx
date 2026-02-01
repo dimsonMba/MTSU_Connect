@@ -24,7 +24,7 @@ type TabType = "people" | "chats";
 
 export default function ChatsListScreen() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<TabType>("people");
+  const [activeTab, setActiveTab] = useState<TabType>("chats");
   const [conversations, setConversations] = useState<ChatConversation[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [filteredStudents, setFilteredStudents] = useState<Student[]>([]);
@@ -65,9 +65,6 @@ export default function ChatsListScreen() {
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "profiles" },
         (payload: any) => {
-          // Realtime payload shape can differ between environments / SDK
-          // versions. Try both `new` and `record` fields and guard against
-          // missing data to avoid runtime crashes when payload is undefined.
           const updated = (payload &&
             ((payload as any).new ?? (payload as any).record)) as any;
           if (!updated) return;
@@ -86,8 +83,20 @@ export default function ChatsListScreen() {
       )
       .subscribe();
 
+    const participantsChannel = supabase
+      .channel("chat_participants:presence")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "chat_participants" },
+        () => {
+          loadConversations();
+        }
+      )
+      .subscribe();
+
     return () => {
       supabase.removeChannel(channel);
+      supabase.removeChannel(participantsChannel);
     };
   }, []);
 
@@ -123,13 +132,13 @@ export default function ChatsListScreen() {
       student.id,
     );
     setCreatingChat(null);
-
-    if (error) {
+    
+    if (error || !data) {
       Alert.alert("Error", "Failed to start chat");
       return;
     }
 
-    if (data) router.push(`/chat/${data.id}`);
+    router.push(`/chat/${data.id}`);
   };
 
   const onlineCount = filteredStudents.filter(

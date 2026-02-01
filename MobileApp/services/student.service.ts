@@ -19,7 +19,7 @@ class StudentService {
 
     const { data, error } = await supabase
       .from("profiles")
-      .select("id, full_name, avatar_url, major, gpa, is_online, last_seen")
+      .select("id, full_name, major, gpa, is_online, last_seen")
       .neq("id", user.id) // Exclude current user
       .order("full_name", { ascending: true });
 
@@ -37,7 +37,7 @@ class StudentService {
 
     const { data, error } = await supabase
       .from("profiles")
-      .select("id, full_name, avatar_url, major, gpa, is_online, last_seen")
+      .select("id, full_name, major, gpa, is_online, last_seen")
       .neq("id", user.id)
       .or(`full_name.ilike.${searchQuery},major.ilike.${searchQuery}`)
       .order("full_name", { ascending: true });
@@ -65,13 +65,18 @@ class StudentService {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { error: "Not authenticated" };
 
+    const fullName = user.user_metadata?.full_name;
     const { error } = await supabase
       .from("profiles")
-      .update({
-        is_online: isOnline,
-        last_seen: new Date().toISOString(),
-      })
-      .eq("id", user.id);
+      .upsert(
+        {
+          id: user.id,
+          ...(fullName ? { full_name: fullName } : {}),
+          is_online: isOnline,
+          last_seen: new Date().toISOString(),
+        },
+        { onConflict: "id" }
+      );
 
     return { error };
   }
