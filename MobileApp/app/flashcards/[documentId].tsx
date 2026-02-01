@@ -11,7 +11,6 @@ import { useLocalSearchParams, Stack, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { colors } from "@/constants/colors";
 import { FlashCard } from "@/components/FlashCard";
-import { mockPDFs } from "@/mocks/data";
 import { getFlashcards } from "@/services/rag/getFlashcards";
 import { getDocument } from "@/services/storage/documents/getDocument";
 import {
@@ -133,6 +132,8 @@ export default function FlashcardsScreen() {
       <View style={styles.cardsContainer}>
         {loading ? (
           <ActivityIndicator size="large" color={colors.primary} />
+        ) : cards.length === 0 ? (
+          <Text style={styles.emptyText}>No flashcards yet</Text>
         ) : isComplete ? (
           <View style={styles.completeContainer}>
             <View style={styles.completeIcon}>
@@ -145,9 +146,7 @@ export default function FlashcardsScreen() {
 
             <View style={styles.scoreCard}>
               <View style={styles.scoreItem}>
-                <Text style={styles.scoreValue}>
-                  {Math.round((correct / cards.length) * 100)}%
-                </Text>
+                <Text style={styles.scoreValue}>{cards.length > 0 ? Math.round((correct / cards.length) * 100) : 0}%</Text>
                 <Text style={styles.scoreLabel}>Accuracy</Text>
               </View>
               <View style={styles.scoreDivider} />
@@ -188,7 +187,7 @@ export default function FlashcardsScreen() {
         )}
       </View>
 
-      {!isComplete && (
+      {cards.length > 0 && !isComplete && (
         <View style={styles.hintContainer}>
           <View style={styles.hintRow}>
             <View
