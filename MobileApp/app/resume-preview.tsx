@@ -86,12 +86,6 @@ export default function ResumePreviewScreen() {
       >
         <View style={styles.resumeContainer}>
           <View style={styles.resumeHeader}>
-<<<<<<< HEAD
-            <Text style={styles.resumeName}>{displayName}</Text>
-            {displayEmail ? (
-              <Text style={styles.resumeContact}>{displayEmail}</Text>
-            ) : null}
-=======
             <Text style={styles.resumeName}>{resume?.header?.fullName}</Text>
             <Text style={styles.resumeContact}>
               {resume?.header?.email} • {resume?.header?.phone}
@@ -106,7 +100,6 @@ export default function ResumePreviewScreen() {
             <Text style={styles.resumeContact}>
               {resume?.summary}
             </Text>
->>>>>>> origin/feature/resume
           </View>
 
           <View style={styles.resumeSection}>
@@ -116,17 +109,6 @@ export default function ResumePreviewScreen() {
                 <Text style={styles.entryTitle}>
                   {resume?.education?.[0]?.school || "Middle Tennessee State University"}
                 </Text>
-<<<<<<< HEAD
-                {displayYear ? (
-                  <Text style={styles.entryDate}>{displayYear}</Text>
-                ) : null}
-              </View>
-              <Text style={styles.entrySubtitle}>
-                Bachelor of Science in {displayMajor}
-              </Text>
-              <Text style={styles.entryDetail}>
-                GPA: {displayGPA !== null && displayGPA !== undefined ? displayGPA.toFixed(2) : "N/A"}
-=======
                 <Text style={styles.entryDate}>{resume?.education?.[0]?.date || ""}</Text>
               </View>
               <Text style={styles.entrySubtitle}>
@@ -134,7 +116,6 @@ export default function ResumePreviewScreen() {
               </Text>
               <Text style={styles.entryDetail}>
                 GPA: {resume?.education?.[0]?.gpa} • Dean's List (4 semesters)
->>>>>>> origin/feature/resume
               </Text>
             </View>
           </View>
