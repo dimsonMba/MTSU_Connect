@@ -211,21 +211,12 @@ const styles = StyleSheet.create({
     //flex: 1,
   },
   scrollContent: {
-<<<<<<< HEAD
-    //padding: 10, //side padding
-    //paddingBottom: 32,
-    //gap: 16,
-  },
-  searchContainer: {
-    //marginBottom: 20,
-    //marginTop: 10, //changed this
-=======
-    padding: 20,
+    padding: 16,
     paddingBottom: 32,
+    gap: 16,
   },
   searchContainer: {
     marginBottom: 20,
->>>>>>> dc12c55698518acb6089a6c072b7d81420376904
   },
   searchBar: {
     flexDirection: "row",
