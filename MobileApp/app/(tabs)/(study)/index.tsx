@@ -64,8 +64,8 @@ export default function StudyScreen() {
     <SafeAreaView style={styles.container} edges={["top"]}>
       <View style={styles.container}>
       <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
+        //style={styles.scrollView}
+        //contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.searchContainer}>
@@ -191,20 +191,20 @@ export default function StudyScreen() {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    backgroundColor: colors.background,
+    //flex: 1,
+    //backgroundColor: colors.background,
   },
   scrollView: {
-    flex: 1,
+    //flex: 1,
   },
   scrollContent: {
-    padding: 16,
-    paddingBottom: 32,
-    gap: 16,
+    //padding: 10, //side padding
+    //paddingBottom: 32,
+    //gap: 16,
   },
   searchContainer: {
-    marginBottom: 20,
-    paddingHorizontal: 16,
+    //marginBottom: 20,
+    //marginTop: 10, //changed this
   },
   searchBar: {
     flexDirection: "row",
