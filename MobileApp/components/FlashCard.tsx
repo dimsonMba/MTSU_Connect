@@ -1,9 +1,17 @@
-import React, { useRef, useState } from 'react';
-import { View, Text, StyleSheet, Animated, PanResponder, Dimensions, Pressable } from 'react-native';
-import { colors } from '@/constants/colors';
-import { RotateCcw } from 'lucide-react-native';
+import React, { useRef, useState, useCallback } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  Animated,
+  PanResponder,
+  Dimensions,
+  Pressable,
+} from "react-native";
+import { colors } from "@/constants/colors";
+import { RotateCcw } from "lucide-react-native";
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.25;
 
 interface FlashCardProps {
@@ -14,59 +22,100 @@ interface FlashCardProps {
   cardIndex: number;
 }
 
-export function FlashCard({ question, answer, onSwipeLeft, onSwipeRight, cardIndex }: FlashCardProps) {
+export function FlashCard({
+  question,
+  answer,
+  onSwipeLeft,
+  onSwipeRight,
+  cardIndex,
+}: FlashCardProps) {
   const [isFlipped, setIsFlipped] = useState(false);
   const position = useRef(new Animated.ValueXY()).current;
   const flipAnim = useRef(new Animated.Value(0)).current;
 
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onPanResponderMove: (_, gesture) => {
-        position.setValue({ x: gesture.dx, y: gesture.dy });
-      },
-      onPanResponderRelease: (_, gesture) => {
-        if (gesture.dx > SWIPE_THRESHOLD) {
-          swipeRight();
-        } else if (gesture.dx < -SWIPE_THRESHOLD) {
-          swipeLeft();
-        } else {
-          resetPosition();
-        }
-      },
-    })
-  ).current;
+  // Store callbacks in refs so PanResponder always has latest values
+  const onSwipeLeftRef = useRef(onSwipeLeft);
+  const onSwipeRightRef = useRef(onSwipeRight);
+  onSwipeLeftRef.current = onSwipeLeft;
+  onSwipeRightRef.current = onSwipeRight;
 
-  const swipeRight = () => {
+  const swipeRight = useCallback(() => {
     Animated.timing(position, {
       toValue: { x: SCREEN_WIDTH + 100, y: 0 },
       duration: 250,
       useNativeDriver: true,
     }).start(() => {
-      onSwipeRight?.();
+      onSwipeRightRef.current?.();
       position.setValue({ x: 0, y: 0 });
       setIsFlipped(false);
     });
-  };
+  }, [position]);
 
-  const swipeLeft = () => {
+  const swipeLeft = useCallback(() => {
     Animated.timing(position, {
       toValue: { x: -SCREEN_WIDTH - 100, y: 0 },
       duration: 250,
       useNativeDriver: true,
     }).start(() => {
-      onSwipeLeft?.();
+      onSwipeLeftRef.current?.();
       position.setValue({ x: 0, y: 0 });
       setIsFlipped(false);
     });
-  };
+  }, [position]);
 
-  const resetPosition = () => {
+  const resetPosition = useCallback(() => {
     Animated.spring(position, {
       toValue: { x: 0, y: 0 },
       useNativeDriver: true,
     }).start();
-  };
+  }, [position]);
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gesture) => {
+        // Only respond to horizontal drags
+        return (
+          Math.abs(gesture.dx) > Math.abs(gesture.dy) &&
+          Math.abs(gesture.dx) > 5
+        );
+      },
+      onPanResponderMove: (_, gesture) => {
+        position.setValue({ x: gesture.dx, y: gesture.dy * 0.3 });
+      },
+      onPanResponderRelease: (_, gesture) => {
+        if (gesture.dx > SWIPE_THRESHOLD && onSwipeRightRef.current) {
+          // Swipe right
+          Animated.timing(position, {
+            toValue: { x: SCREEN_WIDTH + 100, y: 0 },
+            duration: 250,
+            useNativeDriver: true,
+          }).start(() => {
+            onSwipeRightRef.current?.();
+            position.setValue({ x: 0, y: 0 });
+            setIsFlipped(false);
+          });
+        } else if (gesture.dx < -SWIPE_THRESHOLD && onSwipeLeftRef.current) {
+          // Swipe left
+          Animated.timing(position, {
+            toValue: { x: -SCREEN_WIDTH - 100, y: 0 },
+            duration: 250,
+            useNativeDriver: true,
+          }).start(() => {
+            onSwipeLeftRef.current?.();
+            position.setValue({ x: 0, y: 0 });
+            setIsFlipped(false);
+          });
+        } else {
+          // Reset position
+          Animated.spring(position, {
+            toValue: { x: 0, y: 0 },
+            useNativeDriver: true,
+          }).start();
+        }
+      },
+    }),
+  ).current;
 
   const flipCard = () => {
     Animated.spring(flipAnim, {
@@ -80,17 +129,17 @@ export function FlashCard({ question, answer, onSwipeLeft, onSwipeRight, cardInd
 
   const rotate = position.x.interpolate({
     inputRange: [-SCREEN_WIDTH / 2, 0, SCREEN_WIDTH / 2],
-    outputRange: ['-10deg', '0deg', '10deg'],
+    outputRange: ["-10deg", "0deg", "10deg"],
   });
 
   const frontInterpolate = flipAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: ['0deg', '180deg'],
+    outputRange: ["0deg", "180deg"],
   });
 
   const backInterpolate = flipAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: ['180deg', '360deg'],
+    outputRange: ["180deg", "360deg"],
   });
 
   const frontStyle = {
@@ -104,13 +153,13 @@ export function FlashCard({ question, answer, onSwipeLeft, onSwipeRight, cardInd
   const leftOpacity = position.x.interpolate({
     inputRange: [-SCREEN_WIDTH / 2, 0],
     outputRange: [1, 0],
-    extrapolate: 'clamp',
+    extrapolate: "clamp",
   });
 
   const rightOpacity = position.x.interpolate({
     inputRange: [0, SCREEN_WIDTH / 2],
     outputRange: [0, 1],
-    extrapolate: 'clamp',
+    extrapolate: "clamp",
   });
 
   return (
@@ -128,10 +177,14 @@ export function FlashCard({ question, answer, onSwipeLeft, onSwipeRight, cardInd
       ]}
       {...panResponder.panHandlers}
     >
-      <Animated.View style={[styles.badge, styles.wrongBadge, { opacity: leftOpacity }]}>
+      <Animated.View
+        style={[styles.badge, styles.wrongBadge, { opacity: leftOpacity }]}
+      >
         <Text style={styles.badgeText}>RETRY</Text>
       </Animated.View>
-      <Animated.View style={[styles.badge, styles.correctBadge, { opacity: rightOpacity }]}>
+      <Animated.View
+        style={[styles.badge, styles.correctBadge, { opacity: rightOpacity }]}
+      >
         <Text style={styles.badgeText}>GOT IT!</Text>
       </Animated.View>
 
@@ -149,7 +202,9 @@ export function FlashCard({ question, answer, onSwipeLeft, onSwipeRight, cardInd
           <Text style={styles.answerText}>{answer}</Text>
           <View style={styles.flipHint}>
             <RotateCcw size={16} color={colors.white} />
-            <Text style={[styles.flipHintText, { color: colors.white }]}>Tap to flip</Text>
+            <Text style={[styles.flipHintText, { color: colors.white }]}>
+              Tap to flip
+            </Text>
           </View>
         </Animated.View>
       </Pressable>
@@ -159,7 +214,7 @@ export function FlashCard({ question, answer, onSwipeLeft, onSwipeRight, cardInd
 
 const styles = StyleSheet.create({
   cardContainer: {
-    position: 'absolute',
+    position: "absolute",
     width: SCREEN_WIDTH - 40,
     height: 380,
   },
@@ -167,15 +222,15 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   card: {
-    position: 'absolute',
-    width: '100%',
-    height: '100%',
+    position: "absolute",
+    width: "100%",
+    height: "100%",
     borderRadius: 24,
     padding: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backfaceVisibility: 'hidden',
-    shadowColor: '#000',
+    justifyContent: "center",
+    alignItems: "center",
+    backfaceVisibility: "hidden",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.15,
     shadowRadius: 16,
@@ -188,34 +243,34 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
   },
   cardLabel: {
-    position: 'absolute',
+    position: "absolute",
     top: 20,
     left: 24,
     fontSize: 12,
-    fontWeight: '600' as const,
+    fontWeight: "600" as const,
     color: colors.textMuted,
-    textTransform: 'uppercase',
+    textTransform: "uppercase",
     letterSpacing: 1,
   },
   questionText: {
     fontSize: 22,
-    fontWeight: '600' as const,
+    fontWeight: "600" as const,
     color: colors.text,
-    textAlign: 'center',
+    textAlign: "center",
     lineHeight: 32,
   },
   answerText: {
     fontSize: 20,
-    fontWeight: '500' as const,
+    fontWeight: "500" as const,
     color: colors.white,
-    textAlign: 'center',
+    textAlign: "center",
     lineHeight: 30,
   },
   flipHint: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 6,
   },
   flipHintText: {
@@ -223,7 +278,7 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
   },
   badge: {
-    position: 'absolute',
+    position: "absolute",
     top: 30,
     paddingHorizontal: 16,
     paddingVertical: 8,
@@ -234,16 +289,16 @@ const styles = StyleSheet.create({
   wrongBadge: {
     right: 20,
     borderColor: colors.error,
-    transform: [{ rotate: '15deg' }],
+    transform: [{ rotate: "15deg" }],
   },
   correctBadge: {
     left: 20,
     borderColor: colors.success,
-    transform: [{ rotate: '-15deg' }],
+    transform: [{ rotate: "-15deg" }],
   },
   badgeText: {
     fontSize: 16,
-    fontWeight: '800' as const,
+    fontWeight: "800" as const,
     color: colors.text,
   },
 });

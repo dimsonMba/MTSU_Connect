@@ -64,16 +64,25 @@ export default function ChatsListScreen() {
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "profiles" },
-        (payload) => {
-          const updated = payload.new as any;
+        (payload: any) => {
+          // Realtime payload shape can differ between environments / SDK
+          // versions. Try both `new` and `record` fields and guard against
+          // missing data to avoid runtime crashes when payload is undefined.
+          const updated = (payload &&
+            ((payload as any).new ?? (payload as any).record)) as any;
+          if (!updated) return;
           setStudents((prev) =>
             prev.map((student) =>
               student.id === updated.id
-                ? { ...student, is_online: updated.is_online, last_seen: updated.last_seen }
-                : student
-            )
+                ? {
+                    ...student,
+                    is_online: updated.is_online,
+                    last_seen: updated.last_seen,
+                  }
+                : student,
+            ),
           );
-        }
+        },
       )
       .subscribe();
 
@@ -90,7 +99,7 @@ export default function ChatsListScreen() {
       const filtered = students.filter(
         (student) =>
           student.full_name.toLowerCase().includes(query) ||
-          (student.major && student.major.toLowerCase().includes(query))
+          (student.major && student.major.toLowerCase().includes(query)),
       );
       setFilteredStudents(filtered);
     }
@@ -110,7 +119,9 @@ export default function ChatsListScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setCreatingChat(student.id);
 
-    const { data, error } = await chatService.createOrGetDirectMessage(student.id);
+    const { data, error } = await chatService.createOrGetDirectMessage(
+      student.id,
+    );
     setCreatingChat(null);
 
     if (error) {
@@ -121,20 +132,40 @@ export default function ChatsListScreen() {
     if (data) router.push(`/chat/${data.id}`);
   };
 
-  const onlineCount = filteredStudents.filter((student) => student.is_online).length;
+  const onlineCount = filteredStudents.filter(
+    (student) => student.is_online,
+  ).length;
 
   const renderStudentItem = ({ item }: { item: Student }) => (
-    <Pressable style={styles.chatItem} onPress={() => handleChatWithStudent(item)} disabled={creatingChat === item.id}>
+    <Pressable
+      style={styles.chatItem}
+      onPress={() => handleChatWithStudent(item)}
+      disabled={creatingChat === item.id}
+    >
       <View style={styles.chatIcon}>
         <User size={24} color={colors.primary} />
       </View>
       <View style={styles.chatContent}>
         <Text style={styles.chatName}>{item.full_name}</Text>
         {item.major && <Text style={styles.chatSubject}>{item.major}</Text>}
-        {item.gpa && <Text style={styles.lastMessage}>GPA: {item.gpa.toFixed(2)}</Text>}
+        {item.gpa && (
+          <Text style={styles.lastMessage}>GPA: {item.gpa.toFixed(2)}</Text>
+        )}
         <View style={styles.statusRow}>
-          <View style={[styles.statusDot, item.is_online ? styles.statusDotOnline : styles.statusDotOffline]} />
-          <Text style={[styles.statusText, item.is_online ? styles.statusTextOnline : styles.statusTextOffline]}>
+          <View
+            style={[
+              styles.statusDot,
+              item.is_online ? styles.statusDotOnline : styles.statusDotOffline,
+            ]}
+          />
+          <Text
+            style={[
+              styles.statusText,
+              item.is_online
+                ? styles.statusTextOnline
+                : styles.statusTextOffline,
+            ]}
+          >
             {item.is_online ? "Online" : "Offline"}
           </Text>
         </View>
@@ -150,11 +181,19 @@ export default function ChatsListScreen() {
   const renderChatItem = ({ item }: { item: ChatConversation }) => (
     <Pressable style={styles.chatItem} onPress={() => handleChatPress(item.id)}>
       <View style={styles.chatIcon}>
-        {item.is_study_room ? <Users size={24} color={colors.primary} /> : <MessageCircle size={24} color={colors.primary} />}
+        {item.is_study_room ? (
+          <Users size={24} color={colors.primary} />
+        ) : (
+          <MessageCircle size={24} color={colors.primary} />
+        )}
       </View>
       <View style={styles.chatContent}>
         <Text style={styles.chatName}>{item.name}</Text>
-        {item.last_message && <Text style={styles.lastMessage} numberOfLines={1}>{item.last_message}</Text>}
+        {item.last_message && (
+          <Text style={styles.lastMessage} numberOfLines={1}>
+            {item.last_message}
+          </Text>
+        )}
       </View>
     </Pressable>
   );
@@ -171,7 +210,10 @@ export default function ChatsListScreen() {
     <SafeAreaView style={styles.container} edges={["top"]}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Messages</Text>
-        <Pressable style={styles.createButton} onPress={() => setShowCreateModal(true)}>
+        <Pressable
+          style={styles.createButton}
+          onPress={() => setShowCreateModal(true)}
+        >
           <Plus size={24} color={colors.white} />
         </Pressable>
       </View>
@@ -181,8 +223,18 @@ export default function ChatsListScreen() {
           style={[styles.tab, activeTab === "people" && styles.tabActive]}
           onPress={() => setActiveTab("people")}
         >
-          <User size={18} color={activeTab === "people" ? colors.primary : colors.textSecondary} />
-          <Text style={[styles.tabText, activeTab === "people" && styles.tabTextActive]}>
+          <User
+            size={18}
+            color={
+              activeTab === "people" ? colors.primary : colors.textSecondary
+            }
+          />
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === "people" && styles.tabTextActive,
+            ]}
+          >
             All People ({filteredStudents.length}) • Online {onlineCount}
           </Text>
         </Pressable>
@@ -190,8 +242,18 @@ export default function ChatsListScreen() {
           style={[styles.tab, activeTab === "chats" && styles.tabActive]}
           onPress={() => setActiveTab("chats")}
         >
-          <MessageCircle size={18} color={activeTab === "chats" ? colors.primary : colors.textSecondary} />
-          <Text style={[styles.tabText, activeTab === "chats" && styles.tabTextActive]}>
+          <MessageCircle
+            size={18}
+            color={
+              activeTab === "chats" ? colors.primary : colors.textSecondary
+            }
+          />
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === "chats" && styles.tabTextActive,
+            ]}
+          >
             My Chats ({conversations.length})
           </Text>
         </Pressable>
@@ -211,11 +273,21 @@ export default function ChatsListScreen() {
       )}
 
       <FlatList
-        data={activeTab === "people" ? (filteredStudents as any) : (conversations as any)}
-        renderItem={activeTab === "people" ? renderStudentItem as any : renderChatItem as any}
+        data={
+          activeTab === "people"
+            ? (filteredStudents as any)
+            : (conversations as any)
+        }
+        renderItem={
+          activeTab === "people"
+            ? (renderStudentItem as any)
+            : (renderChatItem as any)
+        }
         keyExtractor={(item: any) => item.id}
         contentContainerStyle={styles.listContent}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>
@@ -225,7 +297,11 @@ export default function ChatsListScreen() {
         }
       />
 
-      <CreateChatModal visible={showCreateModal} onClose={() => setShowCreateModal(false)} onCreated={loadData} />
+      <CreateChatModal
+        visible={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onCreated={loadData}
+      />
     </SafeAreaView>
   );
 }
@@ -233,24 +309,99 @@ export default function ChatsListScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   centerContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
-  header: { flexDirection: "row", justifyContent: "space-between", padding: 20, borderBottomWidth: 1, borderBottomColor: colors.border },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
   headerTitle: { fontSize: 28, fontWeight: "700", color: colors.text },
-  createButton: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.primary, justifyContent: "center", alignItems: "center" },
+  createButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.primary,
+    justifyContent: "center",
+    alignItems: "center",
+  },
   tabContainer: { flexDirection: "row", padding: 16, gap: 8 },
-  tab: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", padding: 12, borderRadius: 12, backgroundColor: colors.cardBackground, gap: 8, borderWidth: 2, borderColor: "transparent" },
-  tabActive: { backgroundColor: `${colors.primary}10`, borderColor: colors.primary },
+  tab: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: colors.cardBackground,
+    gap: 8,
+    borderWidth: 2,
+    borderColor: "transparent",
+  },
+  tabActive: {
+    backgroundColor: `${colors.primary}10`,
+    borderColor: colors.primary,
+  },
   tabText: { fontSize: 14, fontWeight: "600", color: colors.textSecondary },
   tabTextActive: { color: colors.primary },
-  searchContainer: { flexDirection: "row", alignItems: "center", backgroundColor: colors.cardBackground, marginHorizontal: 16, marginBottom: 8, paddingHorizontal: 16, borderRadius: 12, borderWidth: 1, borderColor: colors.border },
-  searchInput: { flex: 1, fontSize: 16, color: colors.text, paddingVertical: 12, marginLeft: 8 },
+  searchContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.cardBackground,
+    marginHorizontal: 16,
+    marginBottom: 8,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: colors.text,
+    paddingVertical: 12,
+    marginLeft: 8,
+  },
   listContent: { paddingVertical: 8 },
-  chatItem: { flexDirection: "row", padding: 16, backgroundColor: colors.cardBackground, marginHorizontal: 16, marginVertical: 6, borderRadius: 16, borderWidth: 1, borderColor: colors.border },
-  chatIcon: { width: 48, height: 48, borderRadius: 24, backgroundColor: `${colors.primary}15`, justifyContent: "center", alignItems: "center", marginRight: 12 },
+  chatItem: {
+    flexDirection: "row",
+    padding: 16,
+    backgroundColor: colors.cardBackground,
+    marginHorizontal: 16,
+    marginVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  chatIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: `${colors.primary}15`,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 12,
+  },
   chatContent: { flex: 1 },
-  chatName: { fontSize: 16, fontWeight: "600", color: colors.text, marginBottom: 4 },
-  chatSubject: { fontSize: 12, color: colors.primary, fontWeight: "500", marginBottom: 4 },
+  chatName: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: colors.text,
+    marginBottom: 4,
+  },
+  chatSubject: {
+    fontSize: 12,
+    color: colors.primary,
+    fontWeight: "500",
+    marginBottom: 4,
+  },
   lastMessage: { fontSize: 14, color: colors.textSecondary },
-  statusRow: { flexDirection: "row", alignItems: "center", marginTop: 4, gap: 6 },
+  statusRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 4,
+    gap: 6,
+  },
   statusDot: { width: 8, height: 8, borderRadius: 4 },
   statusDotOnline: { backgroundColor: "#22c55e" },
   statusDotOffline: { backgroundColor: colors.textMuted },

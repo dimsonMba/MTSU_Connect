@@ -29,9 +29,3 @@ export async function extractResumeText(
 
   return text;
 }
-
-// Default export to satisfy expo-router. This module is a helper, not a page.
-import React from "react";
-export default function _ApiLibRoute(): null {
-  return null;
-}

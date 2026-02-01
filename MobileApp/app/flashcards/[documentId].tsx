@@ -1,10 +1,19 @@
-import React, { useState } from "react";
-import { View, Text, StyleSheet, Pressable, Dimensions } from "react-native";
+import React, { useEffect, useState } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  Pressable,
+  Dimensions,
+  ActivityIndicator,
+} from "react-native";
 import { useLocalSearchParams, Stack, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { colors } from "@/constants/colors";
 import { FlashCard } from "@/components/FlashCard";
-import { mockFlashcards, mockPDFs } from "@/mocks/data";
+import { mockPDFs } from "@/mocks/data";
+import { getFlashcards } from "@/services/rag/getFlashcards";
+import { getDocument } from "@/services/storage/documents/getDocument";
 import {
   RotateCcw,
   CheckCircle,
@@ -21,9 +30,42 @@ export default function FlashcardsScreen() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [correct, setCorrect] = useState(0);
   const [incorrect, setIncorrect] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [cards, setCards] = useState<
+    Array<{ id: string; question: string; answer: string }>
+  >([]);
+  const [document, setDocument] = useState<{
+    id: string;
+    title?: string;
+  } | null>(null);
 
-  const document = mockPDFs.find((p) => p.id === documentId);
-  const cards = mockFlashcards.filter((f) => f.documentId === documentId);
+  useEffect(() => {
+    let mounted = true;
+    async function load() {
+      try {
+        setLoading(true);
+        const doc = await getDocument(documentId as string);
+        const fetched = await getFlashcards(documentId as string);
+        if (!mounted) return;
+        setDocument(doc || null);
+        setCards(
+          fetched.map((f) => ({
+            id: f.id,
+            question: f.question,
+            answer: f.answer,
+          })),
+        );
+      } catch (err) {
+        console.warn("Failed to load flashcards", err);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    }
+    load();
+    return () => {
+      mounted = false;
+    };
+  }, [documentId]);
 
   const handleSwipeRight = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -87,7 +129,9 @@ export default function FlashcardsScreen() {
       </View>
 
       <View style={styles.cardsContainer}>
-        {isComplete ? (
+        {loading ? (
+          <ActivityIndicator size="large" color={colors.primary} />
+        ) : isComplete ? (
           <View style={styles.completeContainer}>
             <View style={styles.completeIcon}>
               <CheckCircle size={64} color={colors.success} />

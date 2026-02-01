@@ -12,7 +12,8 @@ import { colors } from "@/constants/colors";
 import { PDFCard } from "@/components/PDFCard";
 import { StudyPartnerCard } from "@/components/StudyPartnerCard";
 import { AIProgressOverlay } from "@/components/AIProgressOverlay";
-import { mockPDFs, mockStudyPartners } from "@/mocks/data";
+import { mockStudyPartners } from "@/mocks/data";
+import { getMyDocuments } from "@/services/storage/documents/getMyDocuments";
 import {
   Search,
   Upload,
@@ -24,6 +25,14 @@ import {
   Users,
 } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
+import { Alert } from "react-native";
+import * as DocumentPicker from "expo-document-picker";
+import { createDocument } from "@/services/storage/documents/createDocument";
+import { uploadPdfToStorage } from "@/services/storage/uploadPdf";
+import { updateDocumentStorage } from "@/services/storage/documents/createDocument";
+import { generateFlashcards } from "@/services/rag/flashcards";
+import { ingestPdf } from "@/services/rag/ingestPdf";
+import { supabase } from "@/lib/supabase";
 
 type SearchMode = "pdfs" | "scholar";
 
@@ -32,22 +41,177 @@ export default function StudyScreen() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchMode, setSearchMode] = useState<SearchMode>("pdfs");
   const [isGenerating, setIsGenerating] = useState(false);
-  const [pdfs, setPdfs] = useState(mockPDFs);
+  const [generatingStage, setGeneratingStage] = useState<string | undefined>(
+    undefined,
+  );
+  const [pdfs, setPdfs] = useState<Array<any>>([]);
+  const [loadingDocs, setLoadingDocs] = useState(false);
 
-  const handleGenerateFlashcards = (documentId: string) => {
+  const refreshDocuments = async () => {
+    try {
+      setLoadingDocs(true);
+      const docs = await getMyDocuments();
+      setPdfs(docs);
+    } catch (err) {
+      console.warn("Failed to load documents", err);
+    } finally {
+      setLoadingDocs(false);
+    }
+  };
+
+  React.useEffect(() => {
+    refreshDocuments();
+  }, []);
+
+  const handleGenerateFlashcards = async (documentId: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setIsGenerating(true);
+    try {
+      setGeneratingStage("Ingesting PDF (if needed)...");
+      try {
+        await ingestPdf(documentId);
+      } catch (ingestErr) {
+        console.warn("ingestPdf failed during manual generate", ingestErr);
+      }
 
-    setTimeout(() => {
-      setIsGenerating(false);
+      setGeneratingStage("Generating flashcards...");
+      await generateFlashcards(documentId);
       setPdfs((prev) =>
         prev.map((pdf) =>
           pdf.id === documentId ? { ...pdf, hasFlashcards: true } : pdf,
         ),
       );
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      // Show a small confirmation and let the user open the flashcards
+      Alert.alert(
+        "Flashcards ready",
+        "Flashcards were generated successfully.",
+        [
+          {
+            text: "Open",
+            onPress: () => router.push(`/flashcards/${documentId}`),
+          },
+          { text: "Close", style: "cancel" },
+        ],
+      );
+    } catch (err) {
+      console.warn("Failed to generate flashcards", err);
+      Alert.alert("Generation failed", (err as any)?.message || String(err));
+    } finally {
+      setIsGenerating(false);
+      setGeneratingStage(undefined);
+    }
+  };
+
+  const handleUploadPdf = async () => {
+    try {
+      console.log("handleUploadPdf: start");
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      // Ensure user is authenticated before trying to create/update rows
+      const { data: userRes } = await supabase.auth.getUser();
+      const user = userRes?.user;
+      if (!user || !user.id) {
+        Alert.alert(
+          "Not signed in",
+          "You must be signed in to upload documents.",
+        );
+        return;
+      }
+      const res = await DocumentPicker.getDocumentAsync({
+        type: "application/pdf",
+      });
+      console.log("DocumentPicker result:", res);
+
+      // Handle different runtime shapes. Prefer the documented `type === 'success'` check,
+      // but also support returned objects that include a `uri` field or an `assets` array.
+      let pickedUri: string | undefined;
+      if (res && typeof res === "object") {
+        // Newer Expo DocumentPicker shape (and some platforms): { assets: [{ uri, name, ... }], canceled: boolean }
+        // @ts-ignore
+        if (
+          Array.isArray(res.assets) &&
+          res.assets.length > 0 &&
+          res.assets[0]?.uri
+        ) {
+          // @ts-ignore
+          pickedUri = res.assets[0].uri;
+        } else if ("type" in res) {
+          // Common shape: { type: 'success', uri, name }
+          // @ts-ignore
+          if (res.type !== "success") {
+            Alert.alert("No file selected", "Please pick a PDF to upload.");
+            return;
+          }
+          // @ts-ignore
+          pickedUri = res.uri || res.fileUri || res.uri;
+        } else {
+          // Fallback: if object has uri, use it
+          // @ts-ignore
+          pickedUri = res.uri || res.fileUri;
+        }
+      }
+
+      if (!pickedUri) {
+        Alert.alert(
+          "No file selected",
+          "Please pick a PDF to upload. (picker returned unexpected result)",
+        );
+        console.warn("DocumentPicker returned unexpected shape:", res);
+        return;
+      }
+
+      // create DB row
+      setIsGenerating(true);
+      setGeneratingStage("Creating document record...");
+      const title =
+        "name" in res && res.name
+          ? String(res.name).replace(/\.pdf$/i, "")
+          : "Untitled";
+      const { id: documentId, user_id } = await createDocument(title);
+
+      // upload file to storage
+      const uri = pickedUri as string;
+      console.log("Uploading file URI:", uri);
+      setGeneratingStage("Uploading PDF to storage...");
+      const uploadRes = await uploadPdfToStorage({
+        fileUri: uri,
+        documentId,
+        userId: user_id,
+      });
+      await updateDocumentStorage(documentId, uploadRes.bucket, uploadRes.path);
+
+      // Ingest PDF (extract text, chunk, embed) via edge function
+      try {
+        setGeneratingStage("Ingesting PDF (extracting & embedding)...");
+        await ingestPdf(documentId);
+      } catch (ingestErr) {
+        // Log but allow fallback to try generating flashcards anyway
+        console.warn("ingestPdf failed", ingestErr);
+      }
+
+      // Optionally start generation automatically
+      setGeneratingStage("Generating flashcards...");
+      await generateFlashcards(documentId);
+
+      // refresh list from server so UI stays authoritative
+      await refreshDocuments();
+
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert(
+        "Upload complete",
+        uploadRes.signedUrl
+          ? "Signed URL created (valid 1h)"
+          : "Uploaded to storage",
+      );
+      console.log("Uploaded file signed URL:", uploadRes.signedUrl);
       router.push(`/flashcards/${documentId}`);
-    }, 3000);
+    } catch (err: any) {
+      console.warn("Upload PDF failed", err);
+      Alert.alert("Upload failed", err?.message || String(err));
+    } finally {
+      setIsGenerating(false);
+      setGeneratingStage(undefined);
+    }
   };
 
   const handlePDFPress = (documentId: string) => {
@@ -137,11 +301,14 @@ export default function StudyScreen() {
         </View>
 
         <View style={styles.actionButtonsRow}>
-          <Pressable 
+          <Pressable
             style={[styles.actionButton, styles.chatButton]}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              router.push("/(tabs)/(study)/chats");
+              // Push to the sibling route inside the same stack group. Use a
+              // relative route name ("chats") instead of an absolute path
+              // ("/chats") which would look for a top-level /chats route.
+              router.push("chats" as any);
             }}
           >
             <MessageCircle size={20} color={colors.white} />
@@ -150,7 +317,7 @@ export default function StudyScreen() {
         </View>
 
         <View style={styles.actionButtonsRow}>
-          <Pressable style={styles.actionButton}>
+          <Pressable style={styles.actionButton} onPress={handleUploadPdf}>
             <Upload size={20} color={colors.primary} />
             <Text style={styles.uploadText}>Upload PDF</Text>
           </Pressable>
@@ -168,6 +335,7 @@ export default function StudyScreen() {
             key={pdf.id}
             document={pdf}
             onGenerateFlashcards={() => handleGenerateFlashcards(pdf.id)}
+            onRetry={() => handleGenerateFlashcards(pdf.id)}
             onPress={() => handlePDFPress(pdf.id)}
           />
         ))}
@@ -196,7 +364,7 @@ export default function StudyScreen() {
 
       <AIProgressOverlay
         visible={isGenerating}
-        message="AI is analyzing your PDF..."
+        message={generatingStage ?? "AI is analyzing your PDF..."}
       />
     </View>
   );
