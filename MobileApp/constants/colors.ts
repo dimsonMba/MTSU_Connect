@@ -18,6 +18,23 @@ export const colors = {
   permitBlue: "#3B82F6",
   overlay: "rgba(0, 0, 0, 0.5)",
   shadow: "rgba(0, 0, 0, 0.08)",
+  trueBlue: "#0066CC",
+  trueBlueLight: "#3388DD",
+  trueBlueDark: "#004C99",
+  textPrimary: "#1A1A2E",
+
+  busRoutes: {
+    red: "#EF4444",
+    blue: "#3B82F6",
+    green: "#22C55E",
+  },
+
+  permits: {
+    student: "#22C55E",
+    facultyStaff: "#FFFFFF",
+    handicap: "#3B82F6",
+    maintenance: "#EAB308",
+  },
 };
 
 export default colors;

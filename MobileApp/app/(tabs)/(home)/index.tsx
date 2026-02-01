@@ -131,11 +131,12 @@ export default function HomeScreen() {
         </View>
 
         <BentoCard
+          className="mt-9"
           size="wide"
           subtitle="Campus Transit"
           onPress={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}
         >
-          <View style={styles.busCard}>
+          <View className="mt-9" style={styles.busCard}>
             <View
               style={[
                 styles.iconBadge,
@@ -196,6 +197,7 @@ export default function HomeScreen() {
             <Text style={styles.aiBadgeText}>AI Powered</Text>
           </View>
         </View>
+
         <BentoCard size="medium">
           <Text style={styles.matchSubtitle}>Suggested Study Partners</Text>
           {mockStudyPartners.slice(0, 2).map((partner, index) => (
@@ -271,7 +273,8 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 20,
     paddingBottom: 32,
-  },
+    gap: 12, //FIXING THE CARD SPACING ????
+    },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
