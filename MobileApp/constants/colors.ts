@@ -5,6 +5,7 @@ export const colors = {
   white: "#FFFFFF",
   background: "#F5F5F7",
   cardBg: "#FFFFFF",
+  cardBackground: "#FFFFFF",
   text: "#1A1A1A",
   textSecondary: "#6B7280",
   textMuted: "#9CA3AF",

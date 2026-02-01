@@ -1,8 +1,6 @@
-import React from "react";
 import { Tabs } from "expo-router";
 import { colors } from "@/constants/colors";
-import { Home, BookOpen, Car, Briefcase, User } from "lucide-react-native";
-import { Platform } from "react-native";
+import { Home, Briefcase, Car, User, BookOpen } from "lucide-react-native";
 
 export default function TabLayout() {
   return (
@@ -10,19 +8,10 @@ export default function TabLayout() {
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.textMuted,
+        tabBarInactiveTintColor: colors.textSecondary,
         tabBarStyle: {
-          backgroundColor: colors.white,
+          backgroundColor: colors.background,
           borderTopColor: colors.border,
-          borderTopWidth: 1,
-          paddingTop: 8,
-          paddingBottom: Platform.OS === "ios" ? 28 : 12,
-          height: Platform.OS === "ios" ? 88 : 68,
-        },
-        tabBarLabelStyle: {
-          fontSize: 11,
-          fontWeight: "600" as const,
-          marginTop: 4,
         },
       }}
     >
@@ -37,9 +26,14 @@ export default function TabLayout() {
         name="(study)"
         options={{
           title: "Study",
-          tabBarIcon: ({ color, size }) => (
-            <BookOpen size={size} color={color} />
-          ),
+          tabBarIcon: ({ color, size }) => <BookOpen size={size} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="(career)"
+        options={{
+          title: "Career",
+          tabBarIcon: ({ color, size }) => <Briefcase size={size} color={color} />,
         }}
       />
       <Tabs.Screen
@@ -47,15 +41,6 @@ export default function TabLayout() {
         options={{
           title: "Parking",
           tabBarIcon: ({ color, size }) => <Car size={size} color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="(career)"
-        options={{
-          title: "Career",
-          tabBarIcon: ({ color, size }) => (
-            <Briefcase size={size} color={color} />
-          ),
         }}
       />
       <Tabs.Screen

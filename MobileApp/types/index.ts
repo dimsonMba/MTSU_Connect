@@ -78,19 +78,8 @@ export interface ResumeData {
     gpa: string;
     graduationDate: string;
   };
-  experience: ExperienceItem[];
-  skills: string[];
 }
 
-export interface ExperienceItem {
-  id: string;
-  company: string;
-  position: string;
-  startDate: string;
-  endDate: string;
-  description: string;
-  current: boolean;
-}
 
 export interface StudyPartner {
   id: string;
