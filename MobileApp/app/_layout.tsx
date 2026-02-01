@@ -2,8 +2,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
+import { AppState } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { colors } from "@/constants/colors";
+import { studentService } from "@/services/student.service";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -52,6 +54,31 @@ function RootLayoutNav() {
 export default function RootLayout() {
   useEffect(() => {
     SplashScreen.hideAsync();
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const setPresence = async (isOnline: boolean) => {
+      if (!isMounted) return;
+      await studentService.updatePresence(isOnline);
+    };
+
+    setPresence(true);
+
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") {
+        setPresence(true);
+      } else {
+        setPresence(false);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      subscription.remove();
+      setPresence(false);
+    };
   }, []);
 
   return (

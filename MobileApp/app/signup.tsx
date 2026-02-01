@@ -8,9 +8,11 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { authService } from "@/services/auth.service";
 import { colors } from "@/constants/colors";
 import {
   GraduationCap,
@@ -31,12 +33,58 @@ export default function SignupScreen() {
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSignup = async () => {
+    if (!name || !email || !password || !confirmPassword) {
+      Alert.alert("Error", "Please fill in all fields");
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      Alert.alert("Error", "Passwords do not match");
+      return;
+    }
+
+    if (password.length < 6) {
+      Alert.alert("Error", "Password must be at least 6 characters");
+      return;
+    }
+
+    if (!email.includes("@mtmail.mtsu.edu") && !email.includes("@mtsu.edu")) {
+      Alert.alert("Error", "Please use your MTSU email address");
+      return;
+    }
+
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setIsLoading(true);
-    setTimeout(() => {
+
+    try {
+      const { user, error } = await authService.signUp({
+        email,
+        password,
+        fullName: name,
+      });
+
+      if (error) {
+        Alert.alert("Signup Failed", error.message);
+        setIsLoading(false);
+        return;
+      }
+
+      if (user) {
+        Alert.alert(
+          "Success",
+          "Account created successfully! Please check your email to verify your account.",
+          [
+            {
+              text: "OK",
+              onPress: () => router.replace("/login"),
+            },
+          ]
+        );
+      }
+    } catch (err) {
+      Alert.alert("Error", "An unexpected error occurred");
       setIsLoading(false);
-      router.replace("/(tabs)/(home)");
-    }, 1000);
+    }
   };
 
   const handleSSOSignup = (provider: string) => {

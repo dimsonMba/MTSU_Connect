@@ -18,6 +18,20 @@ export default function StudyLayout() {
           headerLargeTitle: true,
         }}
       />
+      <Stack.Screen
+        name="chats"
+        options={{
+          title: "Study Chats",
+          headerLargeTitle: true,
+        }}
+      />
+      <Stack.Screen
+        name="students"
+        options={{
+          title: "All Students",
+          headerLargeTitle: true,
+        }}
+      />
     </Stack>
   );
 }

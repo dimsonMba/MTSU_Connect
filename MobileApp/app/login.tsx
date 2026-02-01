@@ -8,9 +8,11 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { authService } from "@/services/auth.service";
 import { colors } from "@/constants/colors";
 import {
   GraduationCap,
@@ -30,12 +32,30 @@ export default function LoginScreen() {
   const [isLoading, setIsLoading] = useState(false);
 
   const handleLogin = async () => {
+    if (!email || !password) {
+      Alert.alert("Error", "Please fill in all fields");
+      return;
+    }
+
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setIsLoading(true);
-    setTimeout(() => {
+
+    try {
+      const { user, error } = await authService.signIn({ email, password });
+
+      if (error) {
+        Alert.alert("Login Failed", error.message);
+        setIsLoading(false);
+        return;
+      }
+
+      if (user) {
+        router.replace("/(tabs)/(home)");
+      }
+    } catch (err) {
+      Alert.alert("Error", "An unexpected error occurred");
       setIsLoading(false);
-      router.replace("/(tabs)/(home)");
-    }, 1000);
+    }
   };
 
   const handleSSOLogin = (provider: string) => {

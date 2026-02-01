@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -8,98 +8,213 @@ import {
   Pressable,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
+  Alert,
+  Modal,
+  ScrollView,
 } from "react-native";
-import { useLocalSearchParams, Stack } from "expo-router";
+import { useLocalSearchParams, Stack, useRouter } from "expo-router";
 import { colors } from "@/constants/colors";
 import { ChatBubble } from "@/components/ChatBubble";
-import { Message } from "@/types";
-import { mockChatRooms } from "@/mocks/data";
-import { Send, Paperclip, Users } from "lucide-react-native";
+import { chatService, ChatMessage, ChatParticipant } from "@/services/chat.service";
+import { Send, Paperclip, Users, UserPlus } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
-
-const mockMessages: Message[] = [
-  {
-    id: "1",
-    senderId: "2",
-    senderName: "Alex Chen",
-    content: "Hey everyone! Anyone working on the BST problem from class?",
-    timestamp: new Date(Date.now() - 3600000),
-    isOwn: false,
-  },
-  {
-    id: "2",
-    senderId: "1",
-    senderName: "You",
-    content:
-      "Yeah, I'm stuck on the deletion part. The recursive approach is confusing me.",
-    timestamp: new Date(Date.now() - 3500000),
-    isOwn: true,
-  },
-  {
-    id: "3",
-    senderId: "3",
-    senderName: "Sarah Johnson",
-    content:
-      "I found a great explanation! The key is understanding the three cases: leaf node, one child, and two children.",
-    timestamp: new Date(Date.now() - 3400000),
-    isOwn: false,
-  },
-  {
-    id: "4",
-    senderId: "2",
-    senderName: "Alex Chen",
-    content: "Can you share the link?",
-    timestamp: new Date(Date.now() - 3300000),
-    isOwn: false,
-  },
-  {
-    id: "5",
-    senderId: "3",
-    senderName: "Sarah Johnson",
-    content:
-      "Sure! I'll upload it to our shared folder. Also, does anyone want to meet at the library later to work through it together?",
-    timestamp: new Date(Date.now() - 3200000),
-    isOwn: false,
-  },
-  {
-    id: "6",
-    senderId: "1",
-    senderName: "You",
-    content: "That would be great! What time works for you?",
-    timestamp: new Date(Date.now() - 3100000),
-    isOwn: true,
-  },
-];
+import { supabase } from "@/lib/supabase";
 
 export default function ChatScreen() {
-  const { chatId } = useLocalSearchParams();
-  const [messages, setMessages] = useState<Message[]>(mockMessages);
+  const { chatId } = useLocalSearchParams<{ chatId: string }>();
+  const router = useRouter();
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [participants, setParticipants] = useState<ChatParticipant[]>([]);
+  const [conversationName, setConversationName] = useState("");
+  const [conversationSubject, setConversationSubject] = useState("");
   const [inputText, setInputText] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [isMember, setIsMember] = useState(false);
+  const [joining, setJoining] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string>("");
+  const [showParticipants, setShowParticipants] = useState(false);
   const flatListRef = useRef<FlatList>(null);
 
-  const chatRoom = mockChatRooms.find((r) => r.id === chatId);
+  useEffect(() => {
+    loadChatData();
+    checkMembership();
+  }, [chatId]);
 
-  const handleSend = () => {
-    if (!inputText.trim()) return;
+  useEffect(() => {
+    if (!chatId || !isMember) return;
+
+    // Subscribe to new messages
+    const messageChannel = chatService.subscribeToMessages(
+      chatId as string,
+      (newMessage) => {
+        setMessages((prev) => [...prev, newMessage]);
+        setTimeout(() => {
+          flatListRef.current?.scrollToEnd({ animated: true });
+        }, 100);
+      }
+    );
+
+    // Subscribe to participant status changes
+    const participantChannel = chatService.subscribeToOnlineStatus(
+      chatId as string,
+      () => {
+        loadParticipants();
+      }
+    );
+
+    // Update online status
+    chatService.updateOnlineStatus(chatId as string, true);
+
+    return () => {
+      chatService.updateOnlineStatus(chatId as string, false);
+      supabase.removeChannel(messageChannel);
+      supabase.removeChannel(participantChannel);
+    };
+  }, [chatId, isMember]);
+
+  const checkMembership = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    
+    setCurrentUserId(user.id);
+
+    const { data } = await supabase
+      .from("chat_participants")
+      .select("id")
+      .eq("conversation_id", chatId)
+      .eq("user_id", user.id)
+      .single();
+
+    setIsMember(!!data);
+  };
+
+  const loadChatData = async () => {
+    setLoading(true);
+    
+    // Load conversation details
+    const { data: conv } = await supabase
+      .from("chat_conversations")
+      .select("name, subject")
+      .eq("id", chatId)
+      .single();
+
+    if (conv) {
+      setConversationName(conv.name);
+      setConversationSubject(conv.subject || "");
+    }
+
+    await loadParticipants();
+    await loadMessages();
+    
+    setLoading(false);
+  };
+
+  const loadParticipants = async () => {
+    const { data } = await chatService.getParticipants(chatId as string);
+    if (data) {
+      setParticipants(data);
+    }
+  };
+
+  const loadMessages = async () => {
+    const { data } = await chatService.getMessages(chatId as string);
+    if (data) {
+      setMessages(data);
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: false });
+      }, 100);
+    }
+  };
+
+  const handleJoinGroup = async () => {
+    setJoining(true);
+    const { error } = await chatService.joinConversation(chatId as string);
+    
+    if (error) {
+      Alert.alert("Error", "Failed to join group. Please try again.");
+      setJoining(false);
+      return;
+    }
+
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setIsMember(true);
+    setJoining(false);
+    loadChatData();
+  };
+
+  const handleSend = async () => {
+    if (!inputText.trim() || !isMember) return;
 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
-    const newMessage: Message = {
-      id: Date.now().toString(),
-      senderId: "1",
-      senderName: "You",
-      content: inputText.trim(),
-      timestamp: new Date(),
-      isOwn: true,
-    };
-
-    setMessages((prev) => [...prev, newMessage]);
+    const content = inputText.trim();
     setInputText("");
 
-    setTimeout(() => {
-      flatListRef.current?.scrollToEnd({ animated: true });
-    }, 100);
+    const { error } = await chatService.sendMessage(chatId as string, content);
+
+    if (error) {
+      Alert.alert("Error", "Failed to send message");
+      setInputText(content); // Restore text on error
+    }
   };
+
+  const onlineCount = participants.filter((p) => p.is_online).length;
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
+
+  // Show join screen if not a member
+  if (!isMember) {
+    return (
+      <View style={styles.container}>
+        <Stack.Screen
+          options={{
+            title: conversationName || "Study Group",
+          }}
+        />
+        <View style={styles.joinContainer}>
+          <View style={styles.joinIcon}>
+            <Users size={48} color={colors.primary} />
+          </View>
+          <Text style={styles.joinTitle}>{conversationName}</Text>
+          {conversationSubject && (
+            <Text style={styles.joinSubject}>{conversationSubject}</Text>
+          )}
+          <View style={styles.joinStats}>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{participants.length}</Text>
+              <Text style={styles.statLabel}>Members</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{onlineCount}</Text>
+              <Text style={styles.statLabel}>Online</Text>
+            </View>
+          </View>
+          <Pressable
+            style={[styles.joinButton, joining && styles.joinButtonDisabled]}
+            onPress={handleJoinGroup}
+            disabled={joining}
+          >
+            {joining ? (
+              <ActivityIndicator size="small" color={colors.white} />
+            ) : (
+              <>
+                <UserPlus size={20} color={colors.white} />
+                <Text style={styles.joinButtonText}>Join Study Group</Text>
+              </>
+            )}
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <KeyboardAvoidingView
@@ -109,24 +224,36 @@ export default function ChatScreen() {
     >
       <Stack.Screen
         options={{
-          title: chatRoom?.name || "Chat",
+          title: conversationName || "Chat",
           headerRight: () => (
-            <View style={styles.headerRight}>
+            <Pressable 
+              style={styles.headerRight}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setShowParticipants(true);
+              }}
+            >
               <View style={styles.participantsBadge}>
                 <Users size={14} color={colors.primary} />
                 <Text style={styles.participantsText}>
-                  {chatRoom?.participants || 0}
+                  {participants.length}
                 </Text>
               </View>
-            </View>
+              {onlineCount > 0 && (
+                <View style={styles.onlineBadge}>
+                  <View style={styles.onlineDot} />
+                  <Text style={styles.onlineText}>{onlineCount}</Text>
+                </View>
+              )}
+            </Pressable>
           ),
         }}
       />
 
-      {chatRoom?.isStudyRoom && (
+      {conversationSubject && (
         <View style={styles.roomBanner}>
           <Text style={styles.roomBannerText}>
-            📚 Study Room • {chatRoom.subject}
+            📚 Study Room • {conversationSubject}
           </Text>
         </View>
       )}
@@ -135,7 +262,18 @@ export default function ChatScreen() {
         ref={flatListRef}
         data={messages}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <ChatBubble message={item} />}
+        renderItem={({ item }) => (
+          <ChatBubble
+            message={{
+              id: item.id,
+              senderId: item.sender_id,
+              senderName: item.sender_name,
+              content: item.content,
+              timestamp: new Date(item.created_at),
+              isOwn: item.sender_id === currentUserId,
+            }}
+          />
+        )}
         contentContainerStyle={styles.messagesList}
         showsVerticalScrollIndicator={false}
         onContentSizeChange={() =>
@@ -170,6 +308,66 @@ export default function ChatScreen() {
           />
         </Pressable>
       </View>
+
+      <Modal
+        visible={showParticipants}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowParticipants(false)}
+      >
+        <View style={styles.modalContainer}>
+          <Pressable 
+            style={styles.modalBackdrop} 
+            onPress={() => setShowParticipants(false)}
+          />
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Members ({participants.length})</Text>
+              <Pressable 
+                style={styles.modalCloseButton}
+                onPress={() => setShowParticipants(false)}
+              >
+                <Text style={styles.modalCloseText}>Done</Text>
+              </Pressable>
+            </View>
+            <ScrollView style={styles.participantsList}>
+              {participants.map((participant) => (
+                <View key={participant.id} style={styles.participantItem}>
+                  <View style={styles.participantAvatar}>
+                    <Text style={styles.participantInitial}>
+                      {participant.profile.full_name?.charAt(0).toUpperCase() || "?"}
+                    </Text>
+                    {participant.is_online && (
+                      <View style={styles.participantOnlineDot} />
+                    )}
+                  </View>
+                  <View style={styles.participantInfo}>
+                    <Text style={styles.participantName}>
+                      {participant.profile.full_name || "Unknown User"}
+                    </Text>
+                    {participant.profile.major && (
+                      <Text style={styles.participantMajor}>
+                        {participant.profile.major}
+                      </Text>
+                    )}
+                  </View>
+                  <View style={[
+                    styles.participantStatus,
+                    participant.is_online ? styles.statusOnline : styles.statusOffline
+                  ]}>
+                    <Text style={[
+                      styles.participantStatusText,
+                      participant.is_online ? styles.statusOnlineText : styles.statusOfflineText
+                    ]}>
+                      {participant.is_online ? "Online" : "Offline"}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -179,9 +377,90 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.white,
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: colors.white,
+  },
+  joinContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 32,
+  },
+  joinIcon: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: `${colors.primary}15`,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 24,
+  },
+  joinTitle: {
+    fontSize: 24,
+    fontWeight: "700",
+    color: colors.text,
+    textAlign: "center",
+    marginBottom: 8,
+  },
+  joinSubject: {
+    fontSize: 16,
+    color: colors.primary,
+    fontWeight: "600",
+    marginBottom: 32,
+  },
+  joinStats: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.background,
+    borderRadius: 16,
+    padding: 24,
+    marginBottom: 32,
+  },
+  statItem: {
+    flex: 1,
+    alignItems: "center",
+  },
+  statValue: {
+    fontSize: 32,
+    fontWeight: "700",
+    color: colors.primary,
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontSize: 14,
+    color: colors.textSecondary,
+  },
+  statDivider: {
+    width: 1,
+    height: 40,
+    backgroundColor: colors.border,
+    marginHorizontal: 24,
+  },
+  joinButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.primary,
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    borderRadius: 12,
+    gap: 8,
+  },
+  joinButtonDisabled: {
+    opacity: 0.6,
+  },
+  joinButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: colors.white,
+  },
   headerRight: {
     flexDirection: "row",
     alignItems: "center",
+    gap: 8,
   },
   participantsBadge: {
     flexDirection: "row",
@@ -194,8 +473,28 @@ const styles = StyleSheet.create({
   },
   participantsText: {
     fontSize: 13,
-    fontWeight: "600" as const,
+    fontWeight: "600",
     color: colors.primary,
+  },
+  onlineBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: `${colors.success}15`,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 12,
+    gap: 4,
+  },
+  onlineDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.success,
+  },
+  onlineText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: colors.success,
   },
   roomBanner: {
     backgroundColor: `${colors.primary}10`,
@@ -253,5 +552,112 @@ const styles = StyleSheet.create({
   },
   sendButtonDisabled: {
     backgroundColor: colors.background,
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: "flex-end",
+  },
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+  },
+  modalContent: {
+    backgroundColor: colors.white,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: "80%",
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "700" as const,
+    color: colors.text,
+  },
+  modalCloseButton: {
+    padding: 8,
+  },
+  modalCloseText: {
+    fontSize: 16,
+    fontWeight: "600" as const,
+    color: colors.primary,
+  },
+  participantsList: {
+    padding: 16,
+  },
+  participantItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: colors.background,
+    borderRadius: 12,
+    marginBottom: 8,
+  },
+  participantAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: colors.primary,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 12,
+    position: "relative" as const,
+  },
+  participantInitial: {
+    fontSize: 20,
+    fontWeight: "700" as const,
+    color: colors.white,
+  },
+  participantOnlineDot: {
+    position: "absolute" as const,
+    bottom: 2,
+    right: 2,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: colors.success,
+    borderWidth: 2,
+    borderColor: colors.background,
+  },
+  participantInfo: {
+    flex: 1,
+  },
+  participantName: {
+    fontSize: 16,
+    fontWeight: "600" as const,
+    color: colors.text,
+    marginBottom: 2,
+  },
+  participantMajor: {
+    fontSize: 13,
+    color: colors.textSecondary,
+  },
+  participantStatus: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  statusOnline: {
+    backgroundColor: `${colors.success}15`,
+  },
+  statusOffline: {
+    backgroundColor: `${colors.textMuted}15`,
+  },
+  participantStatusText: {
+    fontSize: 12,
+    fontWeight: "600" as const,
+  },
+  statusOnlineText: {
+    color: colors.success,
+  },
+  statusOfflineText: {
+    color: colors.textMuted,
   },
 });

@@ -20,6 +20,8 @@ import {
   GraduationCap,
   Sparkles,
   X,
+  MessageCircle,
+  Users,
 } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
 
@@ -134,10 +136,25 @@ export default function StudyScreen() {
           </View>
         </View>
 
-        <Pressable style={styles.uploadButton}>
-          <Upload size={20} color={colors.primary} />
-          <Text style={styles.uploadText}>Upload New PDF</Text>
-        </Pressable>
+        <View style={styles.actionButtonsRow}>
+          <Pressable 
+            style={[styles.actionButton, styles.chatButton]}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              router.push("/(tabs)/(study)/chats");
+            }}
+          >
+            <MessageCircle size={20} color={colors.white} />
+            <Text style={styles.chatButtonText}>Messages</Text>
+          </Pressable>
+        </View>
+
+        <View style={styles.actionButtonsRow}>
+          <Pressable style={styles.actionButton}>
+            <Upload size={20} color={colors.primary} />
+            <Text style={styles.uploadText}>Upload PDF</Text>
+          </Pressable>
+        </View>
 
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Your Documents</Text>
@@ -245,14 +262,48 @@ const styles = StyleSheet.create({
   toggleTextActive: {
     color: colors.white,
   },
+  actionButtonsRow: {
+    flexDirection: "row",
+    gap: 12,
+    marginBottom: 24,
+  },
+  actionButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 14,
+    padding: 16,
+    gap: 8,
+  },
+  chatButton: {
+    backgroundColor: colors.primary,
+    borderWidth: 2,
+    borderColor: colors.primary,
+  },
+  chatButtonText: {
+    fontSize: 16,
+    fontWeight: "600" as const,
+    color: colors.white,
+  },
+  studentsButton: {
+    backgroundColor: colors.primary,
+    borderWidth: 2,
+    borderColor: colors.primary,
+  },
+  studentsButtonText: {
+    fontSize: 16,
+    fontWeight: "600" as const,
+    color: colors.white,
+  },
   uploadButton: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: `${colors.primary}10`,
     borderRadius: 14,
     padding: 16,
-    marginBottom: 24,
     gap: 8,
     borderWidth: 2,
     borderColor: colors.primary,
