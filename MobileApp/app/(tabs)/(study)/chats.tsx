@@ -24,7 +24,7 @@ type TabType = "people" | "chats";
 
 export default function ChatsListScreen() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<TabType>("people");
+  const [activeTab, setActiveTab] = useState<TabType>("chats");
   const [conversations, setConversations] = useState<ChatConversation[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [filteredStudents, setFilteredStudents] = useState<Student[]>([]);
@@ -132,13 +132,13 @@ export default function ChatsListScreen() {
       student.id,
     );
     setCreatingChat(null);
-
-    if (error) {
+    
+    if (error || !data) {
       Alert.alert("Error", "Failed to start chat");
       return;
     }
 
-    if (data) router.push(`/chat/${data.id}`);
+    router.push(`/chat/${data.id}`);
   };
 
   const onlineCount = filteredStudents.filter(
