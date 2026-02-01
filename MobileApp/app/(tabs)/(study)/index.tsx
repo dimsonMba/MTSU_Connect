@@ -211,9 +211,8 @@ const styles = StyleSheet.create({
     //flex: 1,
   },
   scrollContent: {
-    padding: 16,
+    padding: 20,
     paddingBottom: 32,
-    gap: 16,
   },
   searchContainer: {
     marginBottom: 20,

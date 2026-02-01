@@ -7,7 +7,8 @@ export default function ProfileLayout() {
       screenOptions={{
         headerStyle: { backgroundColor: colors.background },
         headerTintColor: colors.primary,
-        headerTitleStyle: { fontWeight: "600" as const },
+        headerTitleStyle: { fontWeight: "600" as const, fontSize: 20 },
+        headerTitleAlign: "center",
         headerShadowVisible: false,
       }}
     >
@@ -15,7 +16,7 @@ export default function ProfileLayout() {
         name="index"
         options={{
           title: "Profile",
-          headerLargeTitle: true,
+          headerLargeTitle: false,
         }}
       />
     </Stack>
