@@ -1,25 +1,28 @@
-import React from 'react';
-import { View, Text, StyleSheet, Pressable, Animated } from 'react-native';
-import { colors } from '@/constants/colors';
+import React from "react";
+import { View, Text, StyleSheet, Pressable, Animated } from "react-native";
+import { colors } from "@/constants/colors";
 
 interface BentoCardProps {
   title?: string;
   subtitle?: string;
-  size?: 'small' | 'medium' | 'large' | 'wide';
+  size?: "small" | "medium" | "large" | "wide";
   children?: React.ReactNode;
   onPress?: () => void;
   backgroundColor?: string;
   accentColor?: string;
+  style?: any;
+  className?: string;
 }
 
 export function BentoCard({
   title,
   subtitle,
-  size = 'medium',
+  size = "medium",
   children,
   onPress,
   backgroundColor = colors.cardBg,
   accentColor,
+  style,
 }: BentoCardProps) {
   const scaleAnim = React.useRef(new Animated.Value(1)).current;
 
@@ -58,6 +61,7 @@ export function BentoCard({
           sizeStyles[size],
           { backgroundColor, transform: [{ scale: scaleAnim }] },
           accentColor && { borderLeftWidth: 4, borderLeftColor: accentColor },
+          style,
         ]}
       >
         {(title || subtitle) && (
@@ -83,19 +87,19 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   small: {
-    width: '100%',
+    width: "100%",
     minHeight: 100,
   },
   medium: {
-    width: '100%',
+    width: "100%",
     minHeight: 140,
   },
   large: {
-    width: '100%',
+    width: "100%",
     minHeight: 180,
   },
   wide: {
-    width: '100%',
+    width: "100%",
     minHeight: 100,
   },
   header: {
@@ -103,15 +107,15 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 20,
-    fontWeight: '700' as const,
+    fontWeight: "700" as const,
     color: colors.text,
     letterSpacing: -0.3,
   },
   subtitle: {
     fontSize: 12,
-    fontWeight: '600' as const,
+    fontWeight: "600" as const,
     color: colors.textSecondary,
-    textTransform: 'uppercase',
+    textTransform: "uppercase",
     letterSpacing: 0.5,
     marginBottom: 2,
   },

@@ -131,11 +131,12 @@ export default function HomeScreen() {
         </View>
 
         <BentoCard
+          className="mt-9"
           size="wide"
           subtitle="Campus Transit"
           onPress={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}
         >
-          <View style={styles.busCard}>
+          <View className="mt-9" style={styles.busCard}>
             <View
               style={[
                 styles.iconBadge,
