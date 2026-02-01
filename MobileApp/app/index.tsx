@@ -11,7 +11,7 @@ import { useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { colors } from "@/constants/colors";
 import { GraduationCap, ChevronRight } from "lucide-react-native";
-import { Image } from "expo-image";
+import { Image } from 'expo-image';
 
 const { width } = Dimensions.get("window");
 
@@ -22,6 +22,7 @@ export default function SplashScreen() {
   const textOpacity = useRef(new Animated.Value(0)).current;
   const buttonOpacity = useRef(new Animated.Value(0)).current;
   const buttonTranslate = useRef(new Animated.Value(30)).current;
+
 
   useEffect(() => {
     Animated.sequence([
@@ -79,7 +80,7 @@ export default function SplashScreen() {
           ]}
         >
           <View style={styles.logoCircle}>
-            <Image source={require('@/assets/images/MT_Connect_Logo_.png')} style={{width:65, height:65}} />
+            <Image source={require('@/assets/images/MTConnectLogo.png')} style={{width:65, height:65}} />
           </View>
         </Animated.View>
 

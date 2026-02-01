@@ -25,7 +25,7 @@ import {
 } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
 import { useTheme } from "@/contexts/ThemeContext";
-import { Image } from "expo-image";
+import { Image } from 'expo-image';
 
 export default function SignupScreen() {
   const router = useRouter();
@@ -118,7 +118,7 @@ export default function SignupScreen() {
 
           <View style={styles.header}>
             <View style={styles.logoCircle}>
-              <Image source={require('@/assets/images/MT_Connect_Logo_.png')} style={styles1.logoImage}  />
+              <Image source={require('@/assets/images/MTConnectLogo.png')} style={styles1.logoImage}  />
             </View>
             <Text style={styles.title}>Create Account</Text>
             <Text style={styles.subtitle}>Join MTSU Connect Plus today</Text>
@@ -275,7 +275,7 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: colors.white,
+    //backgroundColor: `${colors.primary}10`,
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 20,
