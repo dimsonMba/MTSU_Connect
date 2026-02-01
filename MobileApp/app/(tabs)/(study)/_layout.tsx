@@ -25,8 +25,7 @@ export default function StudyLayout() {
       <Stack.Screen
         name="chats"
         options={{
-          title: "Study Chats",
-          headerLargeTitle: true,
+          headerShown: false,
         }}
       />
       <Stack.Screen

@@ -238,79 +238,18 @@ class ChatService {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { data: null, error: "Not authenticated" };
 
-    // Check if a direct message conversation already exists between these two users
-    // A direct message is a conversation with exactly 2 participants and is_study_room = false
-    const { data: existingParticipants, error: searchError } = await supabase
-      .from("chat_participants")
-      .select(`
-        conversation_id,
-        chat_conversations!inner(id, name, is_study_room)
-      `)
-      .eq("user_id", user.id);
+    const { data, error } = await supabase
+      .rpc("create_or_get_direct_message", { other_user_id: otherUserId });
 
-    if (!searchError && existingParticipants) {
-      // Filter for direct messages only (not study rooms)
-      for (const participant of existingParticipants) {
-        const conv = participant.chat_conversations as any;
-        if (!conv.is_study_room) {
-          // Check if this conversation has exactly 2 participants and includes otherUserId
-          const { data: allParticipants } = await supabase
-            .from("chat_participants")
-            .select("user_id")
-            .eq("conversation_id", conv.id);
+    if (error) return { data: null, error };
 
-          if (allParticipants && allParticipants.length === 2) {
-            const userIds = allParticipants.map((p) => p.user_id);
-            if (userIds.includes(otherUserId)) {
-              // Found existing DM
-              return { data: { id: conv.id, name: conv.name }, error: null };
-            }
-          }
-        }
-      }
-    }
+    const row = Array.isArray(data) ? data[0] : data;
+    if (!row) return { data: null, error: "Failed to create or get conversation" };
 
-    // No existing DM found, create a new one
-    // Get the other user's profile to create a conversation name
-    const { data: otherProfile } = await supabase
-      .from("profiles")
-      .select("full_name")
-      .eq("id", otherUserId)
-      .single();
-
-    const conversationName = otherProfile?.full_name || "Direct Message";
-
-    const { data: conversation, error: convError } = await supabase
-      .from("chat_conversations")
-      .insert({
-        name: conversationName,
-        is_study_room: false,
-        created_by: user.id,
-      })
-      .select()
-      .single();
-
-    if (convError) return { data: null, error: convError };
-
-    // Add both users as participants
-    const { error: partError } = await supabase
-      .from("chat_participants")
-      .insert([
-        {
-          conversation_id: conversation.id,
-          user_id: user.id,
-          is_online: true,
-        },
-        {
-          conversation_id: conversation.id,
-          user_id: otherUserId,
-          is_online: false,
-        },
-      ]);
-
-    if (partError) return { data: null, error: partError };
-
-    return { data: conversation, error: null };
+    return {
+      data: { id: row.conversation_id, name: row.conversation_name },
+      error: null,
+    };
   }
 
   // Join a conversation
@@ -362,7 +301,7 @@ class ChatService {
           // Fetch sender profile
           const { data: profile } = await supabase
             .from("profiles")
-            .select("full_name, avatar_url")
+            .select("full_name")
             .eq("id", payload.new.sender_id)
             .single();
 
@@ -373,7 +312,7 @@ class ChatService {
             content: payload.new.content,
             created_at: payload.new.created_at,
             sender_name: profile?.full_name || "Unknown",
-            sender_avatar: profile?.avatar_url,
+            // sender_avatar: profile?.avatar_url, // removed due to missing column
           };
 
           callback(message);

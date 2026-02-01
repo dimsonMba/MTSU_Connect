@@ -17,18 +17,24 @@ export function StudyPartnerCard({ partner, onConnect }: StudyPartnerCardProps) 
       </View>
       <View style={styles.content}>
         <Text style={styles.name}>{partner.name}</Text>
-        <Text style={styles.major}>{partner.major}</Text>
-        <View style={styles.statsRow}>
-          <View style={styles.stat}>
-            <BookOpen size={12} color={colors.textSecondary} />
-            <Text style={styles.statText}>{partner.sharedClasses} shared classes</Text>
+        <Text style={styles.major}>{partner.major || "Undeclared"}</Text>
+        {partner.sharedClasses !== undefined ? (
+          <View style={styles.statsRow}>
+            <View style={styles.stat}>
+              <BookOpen size={12} color={colors.textSecondary} />
+              <Text style={styles.statText}>
+                {partner.sharedClasses} shared classes
+              </Text>
+            </View>
           </View>
+        ) : null}
+      </View>
+      {partner.matchScore !== undefined ? (
+        <View style={styles.matchContainer}>
+          <Text style={styles.matchScore}>{partner.matchScore}%</Text>
+          <Text style={styles.matchLabel}>Match</Text>
         </View>
-      </View>
-      <View style={styles.matchContainer}>
-        <Text style={styles.matchScore}>{partner.matchScore}%</Text>
-        <Text style={styles.matchLabel}>Match</Text>
-      </View>
+      ) : null}
       <Pressable style={styles.connectButton} onPress={onConnect}>
         <MessageCircle size={16} color={colors.white} />
       </Pressable>

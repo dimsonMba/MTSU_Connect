@@ -6,7 +6,13 @@ export interface Profile {
   full_name: string | null;
   avatar_url: string | null;
   major: string | null;
+  gpa: number | null;
   year: string | null;
+  permit_type?: "green" | "red" | "blue" | null;
+  credits?: number | null;
+  flashcard_sets?: number | null;
+  is_online?: boolean | null;
+  last_seen?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -23,12 +29,30 @@ class ProfileService {
     return { profile: data as Profile | null, error };
   }
 
-  // Update user profile
+  // Update user profile (creates if doesn't exist)
   async updateProfile(userId: string, updates: Partial<Profile>) {
+    // First try to get the profile
+    const { data: existingProfile } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", userId)
+      .single();
+
+    // If profile doesn't exist, create it with upsert
     const { data, error } = await supabase
       .from("profiles")
-      .update(updates)
-      .eq("id", userId)
+      .upsert({ id: userId, ...updates }, { onConflict: "id" })
+      .select()
+      .single();
+
+    return { profile: data as Profile | null, error };
+  }
+
+  // Create user profile
+  async createProfile(userId: string, profileData: Partial<Profile>) {
+    const { data, error } = await supabase
+      .from("profiles")
+      .insert({ id: userId, ...profileData })
       .select()
       .single();
 

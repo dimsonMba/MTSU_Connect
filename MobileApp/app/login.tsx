@@ -13,6 +13,7 @@ import {
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { authService } from "@/services/auth.service";
+import { profileService } from "@/services/profile.service";
 import { colors } from "@/constants/colors";
 import {
   GraduationCap,
@@ -23,9 +24,11 @@ import {
   ArrowRight,
 } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
+import { useTheme } from "@/contexts/ThemeContext";
 
 export default function LoginScreen() {
   const router = useRouter();
+  const { colors: themeColors } = useTheme();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -50,6 +53,13 @@ export default function LoginScreen() {
       }
 
       if (user) {
+        try {
+          const fullName = user.user_metadata?.full_name;
+          const updates = fullName ? { full_name: fullName } : {};
+          await profileService.updateProfile(user.id, updates);
+        } catch {
+          // Ignore profile upsert errors; user can still proceed.
+        }
         router.replace("/(tabs)/(home)");
       }
     } catch (err) {
@@ -65,7 +75,7 @@ export default function LoginScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: themeColors.background }]}>
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={styles.keyboardView}

@@ -6,13 +6,16 @@ import {
   ScrollView,
   TextInput,
   Pressable,
+  Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { colors } from "@/constants/colors";
 import { PDFCard } from "@/components/PDFCard";
 import { StudyPartnerCard } from "@/components/StudyPartnerCard";
 import { AIProgressOverlay } from "@/components/AIProgressOverlay";
-import { mockPDFs, mockStudyPartners } from "@/mocks/data";
+import { authService } from "@/services/auth.service";
+import { profileService } from "@/services/profile.service";
+import { chatService } from "@/services/chat.service";
 import {
   Search,
   Upload,
@@ -20,19 +23,45 @@ import {
   GraduationCap,
   Sparkles,
   X,
-  MessageCircle,
   Users,
 } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
+import { useTheme } from "@/contexts/ThemeContext";
 
 type SearchMode = "pdfs" | "scholar";
 
 export default function StudyScreen() {
   const router = useRouter();
+  const { colors: themeColors } = useTheme();
   const [searchQuery, setSearchQuery] = useState("");
   const [searchMode, setSearchMode] = useState<SearchMode>("pdfs");
   const [isGenerating, setIsGenerating] = useState(false);
-  const [pdfs, setPdfs] = useState(mockPDFs);
+  const [pdfs, setPdfs] = useState<any[]>([]);
+  const [partners, setPartners] = useState<any[]>([]);
+  const [creatingChat, setCreatingChat] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    const loadPartners = async () => {
+      try {
+        const { user } = await authService.getCurrentUser();
+        if (!user) return;
+
+        const { profiles } = await profileService.getAllProfiles();
+        const otherProfiles = (profiles || [])
+          .filter((p) => p.id !== user.id)
+          .map((p) => ({
+            id: p.id,
+            name: p.full_name || "Student",
+            major: p.major || "Undeclared",
+          }));
+        setPartners(otherProfiles);
+      } catch (err) {
+        console.error("Error loading study partners:", err);
+      }
+    };
+
+    loadPartners();
+  }, []);
 
   const handleGenerateFlashcards = (documentId: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -57,34 +86,56 @@ export default function StudyScreen() {
     }
   };
 
+  const handleConnectToPartner = async (partnerId: string) => {
+    if (creatingChat === partnerId) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setCreatingChat(partnerId);
+
+    const { data, error } = await chatService.createOrGetDirectMessage(partnerId);
+
+    setCreatingChat(null);
+
+    if (error || !data) {
+      console.error("Failed to start chat from study partners:", error);
+      const message =
+        typeof error?.message === "string"
+          ? error.message
+          : "Failed to start chat. Please try again.";
+      Alert.alert("Error", message);
+      return;
+    }
+
+    router.push(`/chat/${data.id}`);
+  };
+
   const filteredPDFs = pdfs.filter((pdf) =>
     pdf.title.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: themeColors.background }]}>
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.searchContainer}>
-          <View style={styles.searchBar}>
-            <Search size={20} color={colors.textSecondary} />
+        <View style={[styles.searchContainer, { backgroundColor: themeColors.cardBackground }]}>
+          <View style={[styles.searchBar, { backgroundColor: themeColors.background }]}>
+            <Search size={20} color={themeColors.textSecondary} />
             <TextInput
-              style={styles.searchInput}
+              style={[styles.searchInput, { color: themeColors.text }]}
               placeholder={
                 searchMode === "pdfs"
                   ? "Search your PDFs..."
                   : "Search Google Scholar..."
               }
-              placeholderTextColor={colors.textMuted}
+              placeholderTextColor={themeColors.textMuted}
               value={searchQuery}
               onChangeText={setSearchQuery}
             />
             {searchQuery.length > 0 && (
               <Pressable onPress={() => setSearchQuery("")}>
-                <X size={18} color={colors.textMuted} />
+                <X size={18} color={themeColors.textMuted} />
               </Pressable>
             )}
           </View>
@@ -137,19 +188,6 @@ export default function StudyScreen() {
         </View>
 
         <View style={styles.actionButtonsRow}>
-          <Pressable 
-            style={[styles.actionButton, styles.chatButton]}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              router.push("/(tabs)/(study)/chats");
-            }}
-          >
-            <MessageCircle size={20} color={colors.white} />
-            <Text style={styles.chatButtonText}>Messages</Text>
-          </Pressable>
-        </View>
-
-        <View style={styles.actionButtonsRow}>
           <Pressable style={styles.actionButton}>
             <Upload size={20} color={colors.primary} />
             <Text style={styles.uploadText}>Upload PDF</Text>
@@ -163,14 +201,18 @@ export default function StudyScreen() {
           </View>
         </View>
 
-        {filteredPDFs.map((pdf) => (
-          <PDFCard
-            key={pdf.id}
-            document={pdf}
-            onGenerateFlashcards={() => handleGenerateFlashcards(pdf.id)}
-            onPress={() => handlePDFPress(pdf.id)}
-          />
-        ))}
+        {filteredPDFs.length === 0 ? (
+          <Text style={styles.emptyText}>No PDFs uploaded yet</Text>
+        ) : (
+          filteredPDFs.map((pdf) => (
+            <PDFCard
+              key={pdf.id}
+              document={pdf}
+              onGenerateFlashcards={() => handleGenerateFlashcards(pdf.id)}
+              onPress={() => handlePDFPress(pdf.id)}
+            />
+          ))
+        )}
 
         <View style={styles.sectionHeader}>
           <View style={styles.sectionTitleRow}>
@@ -182,16 +224,19 @@ export default function StudyScreen() {
           </View>
         </View>
 
-        {mockStudyPartners.map((partner) => (
-          <StudyPartnerCard
-            key={partner.id}
-            partner={partner}
-            onConnect={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              router.push("/chat/new");
-            }}
-          />
-        ))}
+        {partners.length === 0 ? (
+          <Text style={styles.emptyText}>No study partners yet</Text>
+        ) : (
+          partners.map((partner) => (
+            <StudyPartnerCard
+              key={partner.id}
+              partner={partner}
+              onConnect={() => {
+                handleConnectToPartner(partner.id);
+              }}
+            />
+          ))
+        )}
       </ScrollView>
 
       <AIProgressOverlay
@@ -276,16 +321,6 @@ const styles = StyleSheet.create({
     padding: 16,
     gap: 8,
   },
-  chatButton: {
-    backgroundColor: colors.primary,
-    borderWidth: 2,
-    borderColor: colors.primary,
-  },
-  chatButtonText: {
-    fontSize: 16,
-    fontWeight: "600" as const,
-    color: colors.white,
-  },
   studentsButton: {
     backgroundColor: colors.primary,
     borderWidth: 2,
@@ -355,5 +390,11 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "600" as const,
     color: colors.primary,
+  },
+  emptyText: {
+    fontSize: 13,
+    color: colors.textMuted,
+    textAlign: "center",
+    paddingVertical: 8,
   },
 });

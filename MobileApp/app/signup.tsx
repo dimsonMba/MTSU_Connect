@@ -13,6 +13,7 @@ import {
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { authService } from "@/services/auth.service";
+import { profileService } from "@/services/profile.service";
 import { colors } from "@/constants/colors";
 import {
   GraduationCap,
@@ -23,9 +24,11 @@ import {
   ArrowLeft,
 } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
+import { useTheme } from "@/contexts/ThemeContext";
 
 export default function SignupScreen() {
   const router = useRouter();
+  const { colors: themeColors } = useTheme();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -70,6 +73,11 @@ export default function SignupScreen() {
       }
 
       if (user) {
+        try {
+          await profileService.updateProfile(user.id, { full_name: name });
+        } catch {
+          // Ignore profile upsert errors; user can still proceed.
+        }
         Alert.alert(
           "Success",
           "Account created successfully! Please check your email to verify your account.",

@@ -4,7 +4,6 @@ import { useLocalSearchParams, Stack, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { colors } from "@/constants/colors";
 import { FlashCard } from "@/components/FlashCard";
-import { mockFlashcards, mockPDFs } from "@/mocks/data";
 import {
   RotateCcw,
   CheckCircle,
@@ -22,8 +21,8 @@ export default function FlashcardsScreen() {
   const [correct, setCorrect] = useState(0);
   const [incorrect, setIncorrect] = useState(0);
 
-  const document = mockPDFs.find((p) => p.id === documentId);
-  const cards = mockFlashcards.filter((f) => f.documentId === documentId);
+  const document = null;
+  const cards: { id: string; question: string; answer: string }[] = [];
 
   const handleSwipeRight = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -44,8 +43,10 @@ export default function FlashcardsScreen() {
     setIncorrect(0);
   };
 
-  const isComplete = currentIndex >= cards.length;
-  const progress = cards.length > 0 ? (currentIndex / cards.length) * 100 : 0;
+  const hasCards = cards.length > 0;
+  const isComplete = hasCards && currentIndex >= cards.length;
+  const progress = hasCards ? (currentIndex / cards.length) * 100 : 0;
+  const accuracy = hasCards ? Math.round((correct / cards.length) * 100) : 0;
 
   return (
     <SafeAreaView style={styles.container} edges={["bottom"]}>
@@ -87,7 +88,9 @@ export default function FlashcardsScreen() {
       </View>
 
       <View style={styles.cardsContainer}>
-        {isComplete ? (
+        {!hasCards ? (
+          <Text style={styles.emptyText}>No flashcards yet</Text>
+        ) : isComplete ? (
           <View style={styles.completeContainer}>
             <View style={styles.completeIcon}>
               <CheckCircle size={64} color={colors.success} />
@@ -99,9 +102,7 @@ export default function FlashcardsScreen() {
 
             <View style={styles.scoreCard}>
               <View style={styles.scoreItem}>
-                <Text style={styles.scoreValue}>
-                  {Math.round((correct / cards.length) * 100)}%
-                </Text>
+                <Text style={styles.scoreValue}>{accuracy}%</Text>
                 <Text style={styles.scoreLabel}>Accuracy</Text>
               </View>
               <View style={styles.scoreDivider} />
@@ -154,7 +155,7 @@ export default function FlashcardsScreen() {
         )}
       </View>
 
-      {!isComplete && (
+      {hasCards && !isComplete && (
         <View style={styles.hintContainer}>
           <View style={styles.hintRow}>
             <View
@@ -241,6 +242,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 20,
+  },
+  emptyText: {
+    fontSize: 14,
+    color: colors.textMuted,
+    textAlign: "center",
   },
   completeContainer: {
     alignItems: "center",

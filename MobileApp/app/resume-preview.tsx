@@ -2,12 +2,53 @@ import React from "react";
 import { View, Text, StyleSheet, ScrollView, Pressable } from "react-native";
 import { useRouter, Stack } from "expo-router";
 import { colors } from "@/constants/colors";
-import { mockUser } from "@/mocks/data";
+import { authService } from "@/services/auth.service";
+import { profileService } from "@/services/profile.service";
 import { Download, Share2, X } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
 
 export default function ResumePreviewScreen() {
   const router = useRouter();
+  const [userProfile, setUserProfile] = React.useState<any>(null);
+  const [userEmail, setUserEmail] = React.useState("");
+  const [authFullName, setAuthFullName] = React.useState("");
+
+  React.useEffect(() => {
+    const loadProfile = async () => {
+      try {
+        const { user } = await authService.getCurrentUser();
+        if (!user) return;
+
+        setUserEmail(user.email || "");
+        setAuthFullName(user.user_metadata?.full_name || "");
+
+        const { profile, error } = await profileService.getProfile(user.id);
+        if (error && error.code === "PGRST116") {
+          const { profile: newProfile } = await profileService.createProfile(user.id, {
+            full_name: user.user_metadata?.full_name || null,
+            email: user.email || "",
+          });
+          if (newProfile) setUserProfile(newProfile);
+        } else if (profile) {
+          setUserProfile(profile);
+        }
+      } catch (err) {
+        console.error("Error loading resume profile:", err);
+      }
+    };
+
+    loadProfile();
+  }, []);
+
+  const displayName =
+    userProfile?.full_name ||
+    authFullName ||
+    userEmail.split("@")[0] ||
+    "Student";
+  const displayEmail = userEmail || "";
+  const displayMajor = userProfile?.major || "Undeclared";
+  const displayGPA = userProfile?.gpa;
+  const displayYear = userProfile?.year;
 
   const handleDownload = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -39,13 +80,10 @@ export default function ResumePreviewScreen() {
       >
         <View style={styles.resumeContainer}>
           <View style={styles.resumeHeader}>
-            <Text style={styles.resumeName}>{mockUser.name}</Text>
-            <Text style={styles.resumeContact}>
-              {mockUser.email} • (615) 555-0123
-            </Text>
-            <Text style={styles.resumeContact}>
-              linkedin.com/in/jordanmitchell • github.com/jmitchell
-            </Text>
+            <Text style={styles.resumeName}>{displayName}</Text>
+            {displayEmail ? (
+              <Text style={styles.resumeContact}>{displayEmail}</Text>
+            ) : null}
           </View>
 
           <View style={styles.resumeSection}>
@@ -55,13 +93,15 @@ export default function ResumePreviewScreen() {
                 <Text style={styles.entryTitle}>
                   Middle Tennessee State University
                 </Text>
-                <Text style={styles.entryDate}>May 2024</Text>
+                {displayYear ? (
+                  <Text style={styles.entryDate}>{displayYear}</Text>
+                ) : null}
               </View>
               <Text style={styles.entrySubtitle}>
-                Bachelor of Science in {mockUser.major}
+                Bachelor of Science in {displayMajor}
               </Text>
               <Text style={styles.entryDetail}>
-                GPA: {mockUser.gpa.toFixed(2)} • Dean's List (4 semesters)
+                GPA: {displayGPA !== null && displayGPA !== undefined ? displayGPA.toFixed(2) : "N/A"}
               </Text>
             </View>
           </View>

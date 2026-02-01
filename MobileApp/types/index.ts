@@ -85,7 +85,7 @@ export interface StudyPartner {
   id: string;
   name: string;
   avatar?: string;
-  major: string;
-  sharedClasses: number;
-  matchScore: number;
+  major?: string;
+  sharedClasses?: number;
+  matchScore?: number;
 }
