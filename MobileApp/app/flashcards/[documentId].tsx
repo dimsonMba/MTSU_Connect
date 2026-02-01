@@ -130,13 +130,10 @@ export default function FlashcardsScreen() {
       </View>
 
       <View style={styles.cardsContainer}>
-<<<<<<< HEAD
-        {!hasCards ? (
-          <Text style={styles.emptyText}>No flashcards yet</Text>
-=======
         {loading ? (
           <ActivityIndicator size="large" color={colors.primary} />
->>>>>>> 467459a4550271a280c4d067b8a3c70518665c77
+        ) : cards.length === 0 ? (
+          <Text style={styles.emptyText}>No flashcards yet</Text>
         ) : isComplete ? (
           <View style={styles.completeContainer}>
             <View style={styles.completeIcon}>
@@ -149,7 +146,7 @@ export default function FlashcardsScreen() {
 
             <View style={styles.scoreCard}>
               <View style={styles.scoreItem}>
-                <Text style={styles.scoreValue}>{accuracy}%</Text>
+                <Text style={styles.scoreValue}>{cards.length > 0 ? Math.round((correct / cards.length) * 100) : 0}%</Text>
                 <Text style={styles.scoreLabel}>Accuracy</Text>
               </View>
               <View style={styles.scoreDivider} />
@@ -190,7 +187,7 @@ export default function FlashcardsScreen() {
         )}
       </View>
 
-      {hasCards && !isComplete && (
+      {cards.length > 0 && !isComplete && (
         <View style={styles.hintContainer}>
           <View style={styles.hintRow}>
             <View
