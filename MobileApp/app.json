@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "MobileApp",
-    "slug": "MobileApp",
+    "name": "MTSU Connect Plus",
+    "slug": "mtsu-connect-plus",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "mobileapp",
+    "scheme": "mtsuconnectplus",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {

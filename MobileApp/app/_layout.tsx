@@ -1,24 +1,64 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import 'react-native-reanimated';
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Stack } from "expo-router";
+import * as SplashScreen from "expo-splash-screen";
+import React, { useEffect } from "react";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { colors } from "@/constants/colors";
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
+SplashScreen.preventAutoHideAsync();
 
-export const unstable_settings = {
-  anchor: '(tabs)',
-};
+const queryClient = new QueryClient();
+
+function RootLayoutNav() {
+  return (
+    <Stack
+      screenOptions={{
+        headerBackTitle: "Back",
+        headerStyle: { backgroundColor: colors.background },
+        headerTintColor: colors.primary,
+        headerTitleStyle: { fontWeight: "600" as const },
+      }}
+    >
+      <Stack.Screen name="index" options={{ headerShown: false }} />
+      <Stack.Screen name="login" options={{ headerShown: false }} />
+      <Stack.Screen name="signup" options={{ headerShown: false }} />
+      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen
+        name="chat/[chatId]"
+        options={{
+          title: "Chat",
+          presentation: "card",
+        }}
+      />
+      <Stack.Screen
+        name="flashcards/[documentId]"
+        options={{
+          title: "Flashcards",
+          presentation: "card",
+          headerStyle: { backgroundColor: colors.background },
+        }}
+      />
+      <Stack.Screen
+        name="resume-preview"
+        options={{
+          title: "Resume Preview",
+          presentation: "modal",
+        }}
+      />
+    </Stack>
+  );
+}
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
+  useEffect(() => {
+    SplashScreen.hideAsync();
+  }, []);
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-      </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
+    <QueryClientProvider client={queryClient}>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <RootLayoutNav />
+      </GestureHandlerRootView>
+    </QueryClientProvider>
   );
 }
