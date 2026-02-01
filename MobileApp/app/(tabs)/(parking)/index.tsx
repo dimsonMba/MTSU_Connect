@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import MapView, { Marker, Circle } from "react-native-maps";
+import Constants from "expo-constants";
 import { colors } from "@/constants/colors";
 import { PermitSelector } from "@/components/PermitSelector";
 import { ParkingBottomSheet } from "@/components/ParkingBottomSheet";
@@ -22,6 +22,23 @@ const MTSU_REGION = {
 export default function ParkingScreen() {
   const [selectedPermit, setSelectedPermit] = useState<PermitType>(null);
   const [selectedLot, setSelectedLot] = useState<ParkingLot | null>(null);
+  const [mapsModule, setMapsModule] = useState<any>(null);
+  const isExpoGo = Constants.appOwnership === "expo";
+
+  React.useEffect(() => {
+    let mounted = true;
+    if (!isExpoGo) {
+      // dynamic import so Expo Go doesn't attempt to load native module at bundle time
+      import("react-native-maps")
+        .then((m) => mounted && setMapsModule(m))
+        .catch(() => {
+          /* ignore import errors; placeholder will be shown */
+        });
+    }
+    return () => {
+      mounted = false;
+    };
+  }, [isExpoGo]);
 
   const handlePermitSelect = (permit: PermitType) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -65,41 +82,57 @@ export default function ParkingScreen() {
 
   return (
     <View style={styles.container}>
-      <MapView
-        style={styles.map}
-        initialRegion={MTSU_REGION}
-        showsUserLocation
-        showsMyLocationButton
-      >
-        {filteredLots.map((lot) => (
-          <React.Fragment key={lot.id}>
-            <Circle
-              center={{ latitude: lot.latitude, longitude: lot.longitude }}
-              radius={80}
-              fillColor={`${getPermitColor(lot.permitType)}${Math.round(
-                getFullnessOpacity(lot.fullness) * 255,
-              )
-                .toString(16)
-                .padStart(2, "0")}`}
-              strokeColor={getPermitColor(lot.permitType)}
-              strokeWidth={2}
-            />
-            <Marker
-              coordinate={{ latitude: lot.latitude, longitude: lot.longitude }}
-              onPress={() => handleLotPress(lot)}
-            >
-              <View
-                style={[
-                  styles.markerContainer,
-                  { backgroundColor: getPermitColor(lot.permitType) },
-                ]}
+      {/* Only mount the native MapView when we're not running inside Expo Go
+          and the maps module has successfully loaded. Otherwise show a
+          friendly placeholder to avoid TurboModule errors. */}
+      {!isExpoGo && mapsModule ? (
+        <mapsModule.default
+          style={styles.map}
+          initialRegion={MTSU_REGION}
+          showsUserLocation
+          showsMyLocationButton
+        >
+          {filteredLots.map((lot) => (
+            <React.Fragment key={lot.id}>
+              <mapsModule.Circle
+                center={{ latitude: lot.latitude, longitude: lot.longitude }}
+                radius={80}
+                fillColor={`${getPermitColor(lot.permitType)}${Math.round(
+                  getFullnessOpacity(lot.fullness) * 255,
+                )
+                  .toString(16)
+                  .padStart(2, "0")}`}
+                strokeColor={getPermitColor(lot.permitType)}
+                strokeWidth={2}
+              />
+              <mapsModule.Marker
+                coordinate={{
+                  latitude: lot.latitude,
+                  longitude: lot.longitude,
+                }}
+                onPress={() => handleLotPress(lot)}
               >
-                <Text style={styles.markerText}>{lot.availableSpots}</Text>
-              </View>
-            </Marker>
-          </React.Fragment>
-        ))}
-      </MapView>
+                <View
+                  style={[
+                    styles.markerContainer,
+                    { backgroundColor: getPermitColor(lot.permitType) },
+                  ]}
+                >
+                  <Text style={styles.markerText}>{lot.availableSpots}</Text>
+                </View>
+              </mapsModule.Marker>
+            </React.Fragment>
+          ))}
+        </mapsModule.default>
+      ) : (
+        <View style={[styles.map, styles.mapPlaceholder]}>
+          <Text style={styles.mapPlaceholderText}>
+            Maps are unavailable in Expo Go or the native maps module failed to
+            load. Build a development client or prebuild the app to enable
+            native maps.
+          </Text>
+        </View>
+      )}
 
       <SafeAreaView style={styles.overlay} edges={["top"]}>
         <View style={styles.header}>
@@ -155,6 +188,16 @@ const styles = StyleSheet.create({
   },
   map: {
     flex: 1,
+  },
+  mapPlaceholder: {
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+    backgroundColor: colors.background,
+  },
+  mapPlaceholderText: {
+    color: colors.textSecondary,
+    textAlign: "center",
   },
   overlay: {
     position: "absolute",
