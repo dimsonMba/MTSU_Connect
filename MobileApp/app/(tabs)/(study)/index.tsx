@@ -379,11 +379,11 @@ export default function StudyScreen() {
 
 const styles = StyleSheet.create({
   container: {
-    //flex: 1,
-    //backgroundColor: colors.background,
+    flex: 1,
+    backgroundColor: colors.background,
   },
   scrollView: {
-    //flex: 1,
+    flex: 1,
   },
   scrollContent: {
     padding: 20,
