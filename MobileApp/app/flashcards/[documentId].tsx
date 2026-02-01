@@ -275,6 +275,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: 20,
   },
+  emptyText: {
+    fontSize: 14,
+    color: colors.textMuted,
+    textAlign: "center",
+  },
   completeContainer: {
     alignItems: "center",
     paddingHorizontal: 20,
