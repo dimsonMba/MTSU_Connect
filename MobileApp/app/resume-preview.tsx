@@ -1,64 +1,60 @@
 import React from "react";
-import { View, Text, StyleSheet, ScrollView, Pressable } from "react-native";
+import { View, Text, StyleSheet, ScrollView, Pressable, Alert } from "react-native";
 import { useRouter, Stack } from "expo-router";
 import { colors } from "@/constants/colors";
-import { authService } from "@/services/auth.service";
-import { profileService } from "@/services/profile.service";
 import { Download, Share2, X } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
+import * as Sharing from "expo-sharing";
+import * as Print from "expo-print";
+import { WebView } from "react-native-webview";
+import {
+  getResumePreviewPayload,
+} from "@/lib/resumePreviewStore";
 
 export default function ResumePreviewScreen() {
   const router = useRouter();
-  const [userProfile, setUserProfile] = React.useState<any>(null);
-  const [userEmail, setUserEmail] = React.useState("");
-  const [authFullName, setAuthFullName] = React.useState("");
+  const payload = getResumePreviewPayload();
 
-  React.useEffect(() => {
-    const loadProfile = async () => {
-      try {
-        const { user } = await authService.getCurrentUser();
-        if (!user) return;
+  //const html = payload?.html ?? "";
+  const resume = payload?.resumeJson;
 
-        setUserEmail(user.email || "");
-        setAuthFullName(user.user_metadata?.full_name || "");
 
-        const { profile, error } = await profileService.getProfile(user.id);
-        if (error && error.code === "PGRST116") {
-          const { profile: newProfile } = await profileService.createProfile(user.id, {
-            full_name: user.user_metadata?.full_name || null,
-            email: user.email || "",
-          });
-          if (newProfile) setUserProfile(newProfile);
-        } else if (profile) {
-          setUserProfile(profile);
-        }
-      } catch (err) {
-        console.error("Error loading resume profile:", err);
+  const handleDownload = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    if (!resume) return Alert.alert("Nothing to download", "No resume HTML found.");
+
+    try {
+      
+      
+      const available = await Sharing.isAvailableAsync();
+      if (!available) {
+        Alert.alert("Sharing not available on this device.");
+        return;
       }
-    };
 
-    loadProfile();
-  }, []);
-
-  const displayName =
-    userProfile?.full_name ||
-    authFullName ||
-    userEmail.split("@")[0] ||
-    "Student";
-  const displayEmail = userEmail || "";
-  const displayMajor = userProfile?.major || "Undeclared";
-  const displayGPA = userProfile?.gpa;
-  const displayYear = userProfile?.year;
-
-  const handleDownload = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    console.log("Downloading resume...");
+    } catch (e: any) {
+      Alert.alert("Export failed", e?.message ?? "Unknown error");
+    }
   };
 
-  const handleShare = () => {
+  const handleShare = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    console.log("Sharing resume...");
+    if (!resume) return Alert.alert("Nothing to share", "No resume HTML found.");
+
+    try {
+      
+
+      const available = await Sharing.isAvailableAsync();
+      if (!available) {
+        Alert.alert("Sharing not available on this device.");
+        return;
+      }
+
+    } catch (e: any) {
+      Alert.alert("Share failed", e?.message ?? "Unknown error");
+    }
   };
+
 
   return (
     <View style={styles.container}>
@@ -73,6 +69,16 @@ export default function ResumePreviewScreen() {
         }}
       />
 
+      {/* HTML preview */}
+      
+      {/* <View style={styles.previewWrap}>
+        <WebView
+          originWhitelist={["*"]}
+          source={{ html }}
+          style={{ flex: 1, backgroundColor: colors.white }}
+        />
+      </View> */}
+
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
@@ -80,10 +86,20 @@ export default function ResumePreviewScreen() {
       >
         <View style={styles.resumeContainer}>
           <View style={styles.resumeHeader}>
-            <Text style={styles.resumeName}>{displayName}</Text>
-            {displayEmail ? (
-              <Text style={styles.resumeContact}>{displayEmail}</Text>
-            ) : null}
+            <Text style={styles.resumeName}>{resume?.header?.fullName}</Text>
+            <Text style={styles.resumeContact}>
+              {resume?.header?.email} • {resume?.header?.phone}
+            </Text>
+            <Text style={styles.resumeContact}>
+              {resume?.header?.linkedin} • {resume?.header?.github}
+            </Text>
+          </View>
+
+          <View style={styles.resumeSection}>
+            <Text style={styles.sectionTitle}>SUMMARY</Text>
+            <Text style={styles.resumeContact}>
+              {resume?.summary}
+            </Text>
           </View>
 
           <View style={styles.resumeSection}>
@@ -91,17 +107,15 @@ export default function ResumePreviewScreen() {
             <View style={styles.sectionContent}>
               <View style={styles.entryHeader}>
                 <Text style={styles.entryTitle}>
-                  Middle Tennessee State University
+                  {resume?.education?.[0]?.school || "Middle Tennessee State University"}
                 </Text>
-                {displayYear ? (
-                  <Text style={styles.entryDate}>{displayYear}</Text>
-                ) : null}
+                <Text style={styles.entryDate}>{resume?.education?.[0]?.date || ""}</Text>
               </View>
               <Text style={styles.entrySubtitle}>
-                Bachelor of Science in {displayMajor}
+                {resume?.education?.[0]?.degree} in {resume?.education?.[0]?.major}
               </Text>
               <Text style={styles.entryDetail}>
-                GPA: {displayGPA !== null && displayGPA !== undefined ? displayGPA.toFixed(2) : "N/A"}
+                GPA: {resume?.education?.[0]?.gpa} • Dean's List (4 semesters)
               </Text>
             </View>
           </View>
@@ -110,44 +124,44 @@ export default function ResumePreviewScreen() {
             <Text style={styles.sectionTitle}>EXPERIENCE</Text>
             <View style={styles.sectionContent}>
               <View style={styles.entryHeader}>
-                <Text style={styles.entryTitle}>Software Engineer Intern</Text>
-                <Text style={styles.entryDate}>Jun 2023 - Present</Text>
+                <Text style={styles.entryTitle}>{resume?.experience?.[0]?.title}</Text>
+                <Text style={styles.entryDate}>{resume?.experience?.[0]?.date}</Text>
               </View>
               <Text style={styles.entrySubtitle}>
-                Tech Solutions Inc., Nashville, TN
+                {resume?.experience?.[0]?.companyLine}
               </Text>
               <View style={styles.bulletList}>
                 <Text style={styles.bulletItem}>
-                  • Developed RESTful APIs using Node.js and Express, improving
-                  data retrieval speed by 40%
+                  • {resume?.experience?.[0]?.bullets?.[0] ||
+                    "• Developed and maintained mobile applications using React Native"}
                 </Text>
                 <Text style={styles.bulletItem}>
-                  • Collaborated with cross-functional teams to implement new
-                  features using React Native
+                  • {resume?.experience?.[0]?.bullets?.[1] ||
+                    "• Collaborated with cross-functional teams to define, design, and ship new features"}
                 </Text>
                 <Text style={styles.bulletItem}>
-                  • Participated in code reviews and implemented best practices
-                  for code quality
+                  • {resume?.experience?.[0]?.bullets?.[2] ||
+                    "• Optimized applications for maximum speed and scalability"}
                 </Text>
               </View>
             </View>
 
             <View style={[styles.sectionContent, { marginTop: 16 }]}>
               <View style={styles.entryHeader}>
-                <Text style={styles.entryTitle}>Teaching Assistant</Text>
-                <Text style={styles.entryDate}>Aug 2022 - May 2023</Text>
+                <Text style={styles.entryTitle}>{resume?.experience?.[1]?.title}</Text>
+                <Text style={styles.entryDate}>{resume?.experience?.[1]?.date}</Text>
               </View>
               <Text style={styles.entrySubtitle}>
-                MTSU Computer Science Department
+                {resume?.experience?.[1]?.companyLine}
               </Text>
               <View style={styles.bulletList}>
                 <Text style={styles.bulletItem}>
-                  • Assisted 100+ students in Data Structures and Algorithms
-                  coursework
+                  {resume?.experience?.[1]?.bullets?.[0] ||
+                    "• Assisted 100+ students in Data Structures and Algorithms coursework"}
                 </Text>
                 <Text style={styles.bulletItem}>
-                  • Conducted weekly office hours and graded programming
-                  assignments
+                  {resume?.experience?.[1]?.bullets?.[1] ||
+                    "• Conducted weekly office hours and graded programming assignments"}
                 </Text>
               </View>
             </View>
@@ -157,17 +171,17 @@ export default function ResumePreviewScreen() {
             <Text style={styles.sectionTitle}>PROJECTS</Text>
             <View style={styles.sectionContent}>
               <View style={styles.entryHeader}>
-                <Text style={styles.entryTitle}>Campus Navigation App</Text>
-                <Text style={styles.entryDate}>2023</Text>
+                <Text style={styles.entryTitle}>{resume?.projects?.[0]?.title}</Text>
+                <Text style={styles.entryDate}>{resume?.projects?.[0]?.date}</Text>
               </View>
               <View style={styles.bulletList}>
                 <Text style={styles.bulletItem}>
-                  • Built a React Native app with real-time campus navigation
-                  using Google Maps API
+                  {resume?.projects?.[0]?.bullets?.[0] ||
+                    "Built a React Native app with real-time campus navigation using Google Maps API"}
                 </Text>
                 <Text style={styles.bulletItem}>
-                  • Implemented accessibility features for users with mobility
-                  challenges
+                  {resume?.projects?.[0]?.bullets?.[1] ||
+                    "Implemented accessibility features for users with mobility challenges"}  
                 </Text>
               </View>
             </View>
@@ -208,6 +222,16 @@ export default function ResumePreviewScreen() {
 }
 
 const styles = StyleSheet.create({
+  previewWrap: {
+    flex: 1,
+    margin: 16,
+    borderRadius: 12,
+    overflow: "hidden",
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -249,7 +273,7 @@ const styles = StyleSheet.create({
     letterSpacing: 2,
   },
   resumeContact: {
-    fontSize: 11,
+    fontSize: 9.5,
     color: colors.textSecondary,
     marginBottom: 2,
   },

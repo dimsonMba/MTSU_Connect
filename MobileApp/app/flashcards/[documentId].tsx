@@ -11,7 +11,6 @@ import { useLocalSearchParams, Stack, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { colors } from "@/constants/colors";
 import { FlashCard } from "@/components/FlashCard";
-import { mockPDFs } from "@/mocks/data";
 import { getFlashcards } from "@/services/rag/getFlashcards";
 import { getDocument } from "@/services/storage/documents/getDocument";
 import {
@@ -86,12 +85,10 @@ export default function FlashcardsScreen() {
     setIncorrect(0);
   };
 
-const isComplete = currentIndex >= cards.length;
-const progress = cards.length > 0 ? (currentIndex / cards.length) * 100 : 0;
-const accuracy = cards.length > 0 ? Math.round((correct / cards.length) * 100) : 0;
-const hasCards = cards.length > 0;
-const visibleCards = cards.slice(currentIndex, currentIndex + 3);
-const stackedCards = [...visibleCards].reverse();
+  const isComplete = currentIndex >= cards.length;
+  const progress = cards.length > 0 ? (currentIndex / cards.length) * 100 : 0;
+  const visibleCards = cards.slice(currentIndex, currentIndex + 3);
+  const stackedCards = [...visibleCards].reverse();
 
   return (
     <SafeAreaView style={styles.container} edges={["bottom"]}>
@@ -135,6 +132,8 @@ const stackedCards = [...visibleCards].reverse();
       <View style={styles.cardsContainer}>
         {loading ? (
           <ActivityIndicator size="large" color={colors.primary} />
+        ) : cards.length === 0 ? (
+          <Text style={styles.emptyText}>No flashcards yet</Text>
         ) : isComplete ? (
           <View style={styles.completeContainer}>
             <View style={styles.completeIcon}>
@@ -147,7 +146,7 @@ const stackedCards = [...visibleCards].reverse();
 
             <View style={styles.scoreCard}>
               <View style={styles.scoreItem}>
-                <Text style={styles.scoreValue}>{accuracy}%</Text>
+                <Text style={styles.scoreValue}>{cards.length > 0 ? Math.round((correct / cards.length) * 100) : 0}%</Text>
                 <Text style={styles.scoreLabel}>Accuracy</Text>
               </View>
               <View style={styles.scoreDivider} />
@@ -188,7 +187,7 @@ const stackedCards = [...visibleCards].reverse();
         )}
       </View>
 
-      {hasCards && !isComplete && (
+      {cards.length > 0 && !isComplete && (
         <View style={styles.hintContainer}>
           <View style={styles.hintRow}>
             <View
