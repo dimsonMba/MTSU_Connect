@@ -7,7 +7,9 @@ export default function StudyLayout() {
       screenOptions={{
         headerStyle: { backgroundColor: colors.background },
         headerTintColor: colors.primary,
-        headerTitleStyle: { fontWeight: "600" as const },
+        // Make the title a bit larger and centered.
+        headerTitleStyle: { fontWeight: "600" as const, fontSize: 20 },
+        headerTitleAlign: "center",
         headerShadowVisible: false,
       }}
     >
@@ -15,7 +17,9 @@ export default function StudyLayout() {
         name="index"
         options={{
           title: "Study Hub",
-          headerLargeTitle: true,
+          // Disable large title to avoid extra top spacing on iOS which can
+          // push content down and overlap elements like the search bar.
+          headerLargeTitle: false,
         }}
       />
     </Stack>

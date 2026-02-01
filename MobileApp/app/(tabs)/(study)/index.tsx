@@ -63,129 +63,130 @@ export default function StudyScreen() {
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
       <View style={styles.container}>
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.searchContainer}>
-          <View style={styles.searchBar}>
-            <Search size={20} color={colors.textSecondary} />
-            <TextInput
-              style={styles.searchInput}
-              placeholder={
-                searchMode === "pdfs"
-                  ? "Search yopur PDFs..."
-                  : "Search Google Scholar..."
-              }
-              placeholderTextColor={colors.textMuted}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-            />
-            {searchQuery.length > 0 && (
-              <Pressable onPress={() => setSearchQuery("")}>
-                <X size={18} color={colors.textMuted} />
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.searchContainer}>
+            <View style={styles.searchBar}>
+              <Search size={20} color={colors.textSecondary} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder={
+                  searchMode === "pdfs"
+                    ? "Search yopur PDFs..."
+                    : "Search Google Scholar..."
+                }
+                placeholderTextColor={colors.textMuted}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
+              {searchQuery.length > 0 && (
+                <Pressable onPress={() => setSearchQuery("")}>
+                  <X size={18} color={colors.textMuted} />
+                </Pressable>
+              )}
+            </View>
+            <View style={styles.searchToggle}>
+              <Pressable
+                style={[
+                  styles.toggleButton,
+                  searchMode === "pdfs" && styles.toggleButtonActive,
+                ]}
+                onPress={() => setSearchMode("pdfs")}
+              >
+                <BookOpen
+                  size={14}
+                  color={
+                    searchMode === "pdfs" ? colors.white : colors.textSecondary
+                  }
+                />
+                <Text
+                  style={[
+                    styles.toggleText,
+                    searchMode === "pdfs" && styles.toggleTextActive,
+                  ]}
+                >
+                  My PDFs
+                </Text>
               </Pressable>
-            )}
-          </View>
-          <View style={styles.searchToggle}>
-            <Pressable
-              style={[
-                styles.toggleButton,
-                searchMode === "pdfs" && styles.toggleButtonActive,
-              ]}
-              onPress={() => setSearchMode("pdfs")}
-            >
-              <BookOpen
-                size={14}
-                color={
-                  searchMode === "pdfs" ? colors.white : colors.textSecondary
-                }
-              />
-              <Text
+              <Pressable
                 style={[
-                  styles.toggleText,
-                  searchMode === "pdfs" && styles.toggleTextActive,
+                  styles.toggleButton,
+                  searchMode === "scholar" && styles.toggleButtonActive,
                 ]}
+                onPress={() => setSearchMode("scholar")}
               >
-                My PDFs
-              </Text>
-            </Pressable>
-            <Pressable
-              style={[
-                styles.toggleButton,
-                searchMode === "scholar" && styles.toggleButtonActive,
-              ]}
-              onPress={() => setSearchMode("scholar")}
-            >
-              <GraduationCap
-                size={14}
-                color={
-                  searchMode === "scholar" ? colors.white : colors.textSecondary
-                }
-              />
-              <Text
-                style={[
-                  styles.toggleText,
-                  searchMode === "scholar" && styles.toggleTextActive,
-                ]}
-              >
-                Scholar
-              </Text>
-            </Pressable>
-          </View>
-        </View>
-
-        <Pressable style={styles.uploadButton}>
-          <Upload size={20} color={colors.primary} />
-          <Text style={styles.uploadText}>Upload New PDF</Text>
-        </Pressable>
-
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Your Documents</Text>
-          <View style={styles.countBadge}>
-            <Text style={styles.countText}>{pdfs.length}</Text>
-          </View>
-        </View>
-
-        {filteredPDFs.map((pdf) => (
-          <PDFCard
-            key={pdf.id}
-            document={pdf}
-            onGenerateFlashcards={() => handleGenerateFlashcards(pdf.id)}
-            onPress={() => handlePDFPress(pdf.id)}
-          />
-        ))}
-
-        <View style={styles.sectionHeader}>
-          <View style={styles.sectionTitleRow}>
-            <Text style={styles.sectionTitle}>Study Partners</Text>
-            <View style={styles.aiBadge}>
-              <Sparkles size={12} color={colors.primary} />
-              <Text style={styles.aiBadgeText}>Smart Match</Text>
+                <GraduationCap
+                  size={14}
+                  color={
+                    searchMode === "scholar"
+                      ? colors.white
+                      : colors.textSecondary
+                  }
+                />
+                <Text
+                  style={[
+                    styles.toggleText,
+                    searchMode === "scholar" && styles.toggleTextActive,
+                  ]}
+                >
+                  Scholar
+                </Text>
+              </Pressable>
             </View>
           </View>
-        </View>
 
-        {mockStudyPartners.map((partner) => (
-          <StudyPartnerCard
-            key={partner.id}
-            partner={partner}
-            onConnect={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              router.push("/chat/new");
-            }}
-          />
-        ))}
-      </ScrollView>
+          <Pressable style={styles.uploadButton}>
+            <Upload size={20} color={colors.primary} />
+            <Text style={styles.uploadText}>Upload New PDF</Text>
+          </Pressable>
 
-      <AIProgressOverlay
-        visible={isGenerating}
-        message="AI is analyzing your PDF..."
-      />
-    </View>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Your Documents</Text>
+            <View style={styles.countBadge}>
+              <Text style={styles.countText}>{pdfs.length}</Text>
+            </View>
+          </View>
+
+          {filteredPDFs.map((pdf) => (
+            <PDFCard
+              key={pdf.id}
+              document={pdf}
+              onGenerateFlashcards={() => handleGenerateFlashcards(pdf.id)}
+              onPress={() => handlePDFPress(pdf.id)}
+            />
+          ))}
+
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionTitleRow}>
+              <Text style={styles.sectionTitle}>Study Partners</Text>
+              <View style={styles.aiBadge}>
+                <Sparkles size={12} color={colors.primary} />
+                <Text style={styles.aiBadgeText}>Smart Match</Text>
+              </View>
+            </View>
+          </View>
+
+          {mockStudyPartners.map((partner) => (
+            <StudyPartnerCard
+              key={partner.id}
+              partner={partner}
+              onConnect={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                router.push("/chat/new");
+              }}
+            />
+          ))}
+        </ScrollView>
+
+        <AIProgressOverlay
+          visible={isGenerating}
+          message="AI is analyzing your PDF..."
+        />
+      </View>
     </SafeAreaView>
-    
   );
 }
 
@@ -198,14 +199,19 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    padding: 16,
+    //padding: 16,
+    paddingLeft: 16,
+    paddingRight: 16,
+    paddingTop: 8,
     paddingBottom: 32,
-    gap: 16,
+    gap: 5,
   },
+
   searchContainer: {
-    marginBottom: 20,
+    marginTop: 0,
     paddingHorizontal: 16,
   },
+
   searchBar: {
     flexDirection: "row",
     alignItems: "center",
