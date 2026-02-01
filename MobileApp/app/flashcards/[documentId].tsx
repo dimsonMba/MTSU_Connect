@@ -11,12 +11,9 @@ import { useLocalSearchParams, Stack, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { colors } from "@/constants/colors";
 import { FlashCard } from "@/components/FlashCard";
-<<<<<<< HEAD
-=======
 import { mockPDFs } from "@/mocks/data";
 import { getFlashcards } from "@/services/rag/getFlashcards";
 import { getDocument } from "@/services/storage/documents/getDocument";
->>>>>>> 467459a4550271a280c4d067b8a3c70518665c77
 import {
   RotateCcw,
   CheckCircle,
@@ -42,10 +39,6 @@ export default function FlashcardsScreen() {
     title?: string;
   } | null>(null);
 
-<<<<<<< HEAD
-  const document = null;
-  const cards: { id: string; question: string; answer: string }[] = [];
-=======
   useEffect(() => {
     let mounted = true;
     async function load() {
@@ -73,7 +66,6 @@ export default function FlashcardsScreen() {
       mounted = false;
     };
   }, [documentId]);
->>>>>>> 467459a4550271a280c4d067b8a3c70518665c77
 
   const handleSwipeRight = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -94,17 +86,10 @@ export default function FlashcardsScreen() {
     setIncorrect(0);
   };
 
-<<<<<<< HEAD
-  const hasCards = cards.length > 0;
-  const isComplete = hasCards && currentIndex >= cards.length;
-  const progress = hasCards ? (currentIndex / cards.length) * 100 : 0;
-  const accuracy = hasCards ? Math.round((correct / cards.length) * 100) : 0;
-=======
   const isComplete = currentIndex >= cards.length;
   const progress = cards.length > 0 ? (currentIndex / cards.length) * 100 : 0;
   const visibleCards = cards.slice(currentIndex, currentIndex + 3);
   const stackedCards = [...visibleCards].reverse();
->>>>>>> 467459a4550271a280c4d067b8a3c70518665c77
 
   return (
     <SafeAreaView style={styles.container} edges={["bottom"]}>
@@ -146,13 +131,8 @@ export default function FlashcardsScreen() {
       </View>
 
       <View style={styles.cardsContainer}>
-<<<<<<< HEAD
-        {!hasCards ? (
-          <Text style={styles.emptyText}>No flashcards yet</Text>
-=======
         {loading ? (
           <ActivityIndicator size="large" color={colors.primary} />
->>>>>>> 467459a4550271a280c4d067b8a3c70518665c77
         ) : isComplete ? (
           <View style={styles.completeContainer}>
             <View style={styles.completeIcon}>
@@ -165,7 +145,9 @@ export default function FlashcardsScreen() {
 
             <View style={styles.scoreCard}>
               <View style={styles.scoreItem}>
-                <Text style={styles.scoreValue}>{accuracy}%</Text>
+                <Text style={styles.scoreValue}>
+                  {Math.round((correct / cards.length) * 100)}%
+                </Text>
                 <Text style={styles.scoreLabel}>Accuracy</Text>
               </View>
               <View style={styles.scoreDivider} />
@@ -206,7 +188,7 @@ export default function FlashcardsScreen() {
         )}
       </View>
 
-      {hasCards && !isComplete && (
+      {!isComplete && (
         <View style={styles.hintContainer}>
           <View style={styles.hintRow}>
             <View
@@ -293,11 +275,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 20,
-  },
-  emptyText: {
-    fontSize: 14,
-    color: colors.textMuted,
-    textAlign: "center",
   },
   completeContainer: {
     alignItems: "center",
