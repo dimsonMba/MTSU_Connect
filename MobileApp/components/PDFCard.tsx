@@ -1,16 +1,30 @@
-import React from 'react';
-import { View, Text, StyleSheet, Pressable, Animated } from 'react-native';
-import { colors } from '@/constants/colors';
-import { PDFDocument } from '@/types';
-import { FileText, Sparkles, Check } from 'lucide-react-native';
+import React from "react";
+import { View, Text, StyleSheet, Pressable, Animated } from "react-native";
+import { colors } from "@/constants/colors";
+import { PDFDocument } from "@/types";
+import {
+  FileText,
+  Sparkles,
+  Check,
+  RotateCcw,
+  MessageCircle,
+} from "lucide-react-native";
 
 interface PDFCardProps {
   document: PDFDocument;
   onGenerateFlashcards?: () => void;
+  onRetry?: () => void;
   onPress?: () => void;
+  onAsk?: () => void;
 }
 
-export function PDFCard({ document, onGenerateFlashcards, onPress }: PDFCardProps) {
+export function PDFCard({
+  document,
+  onGenerateFlashcards,
+  onRetry,
+  onPress,
+  onAsk,
+}: PDFCardProps) {
   const scaleAnim = React.useRef(new Animated.Value(1)).current;
 
   const handlePressIn = () => {
@@ -29,8 +43,13 @@ export function PDFCard({ document, onGenerateFlashcards, onPress }: PDFCardProp
   };
 
   const formatDate = (date: Date) => {
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
   };
+
+  const pageLabel =
+    typeof document.pageCount === "number" && document.pageCount > 0
+      ? `${document.pageCount} pages`
+      : "Counting pages…";
 
   return (
     <Pressable
@@ -38,27 +57,51 @@ export function PDFCard({ document, onGenerateFlashcards, onPress }: PDFCardProp
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
     >
-      <Animated.View style={[styles.card, { transform: [{ scale: scaleAnim }] }]}>
+      <Animated.View
+        style={[styles.card, { transform: [{ scale: scaleAnim }] }]}
+      >
         <View style={styles.iconContainer}>
           <FileText size={28} color={colors.primary} />
         </View>
         <View style={styles.content}>
-          <Text style={styles.title} numberOfLines={1}>{document.title}</Text>
+          <Text style={styles.title} numberOfLines={1}>
+            {document.title}
+          </Text>
           <Text style={styles.meta}>
-            {document.pageCount} pages • {formatDate(document.uploadedAt)}
+            {pageLabel} • {formatDate(document.uploadedAt)}
           </Text>
         </View>
-        {document.hasFlashcards ? (
-          <View style={styles.completedBadge}>
-            <Check size={14} color={colors.success} />
-            <Text style={styles.completedText}>Cards Ready</Text>
-          </View>
-        ) : (
-          <Pressable style={styles.generateButton} onPress={onGenerateFlashcards}>
-            <Sparkles size={14} color={colors.white} />
-            <Text style={styles.generateText}>Generate</Text>
-          </Pressable>
-        )}
+        <View style={styles.actionColumn}>
+          {document.hasFlashcards ? (
+            <View style={styles.completedBadge}>
+              <Check size={14} color={colors.success} />
+              <Text style={styles.completedText}>Cards Ready</Text>
+            </View>
+          ) : (
+            <View style={styles.actionsRow}>
+              <Pressable
+                style={styles.generateButton}
+                onPress={onGenerateFlashcards}
+              >
+                <Sparkles size={14} color={colors.white} />
+                <Text style={styles.generateText}>Generate</Text>
+              </Pressable>
+              {onRetry ? (
+                <Pressable style={styles.retryButton} onPress={onRetry}>
+                  <RotateCcw size={16} color={colors.primary} />
+                </Pressable>
+              ) : null}
+            </View>
+          )}
+
+          {onAsk ? (
+            // Quick access into the document-aware chat experience.
+            <Pressable style={styles.askButton} onPress={onAsk}>
+              <MessageCircle size={16} color={colors.primary} />
+              <Text style={styles.askButtonText}>Ask AI</Text>
+            </Pressable>
+          ) : null}
+        </View>
       </Animated.View>
     </Pressable>
   );
@@ -66,8 +109,8 @@ export function PDFCard({ document, onGenerateFlashcards, onPress }: PDFCardProp
 
 const styles = StyleSheet.create({
   card: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: colors.white,
     borderRadius: 16,
     padding: 16,
@@ -83,8 +126,8 @@ const styles = StyleSheet.create({
     height: 52,
     borderRadius: 14,
     backgroundColor: `${colors.primary}10`,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     marginRight: 14,
   },
   content: {
@@ -92,7 +135,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 16,
-    fontWeight: '600' as const,
+    fontWeight: "600" as const,
     color: colors.text,
     marginBottom: 4,
   },
@@ -100,9 +143,13 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.textSecondary,
   },
+  actionColumn: {
+    alignItems: "flex-end",
+    gap: 8,
+  },
   generateButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: colors.primary,
     paddingHorizontal: 12,
     paddingVertical: 8,
@@ -111,12 +158,27 @@ const styles = StyleSheet.create({
   },
   generateText: {
     fontSize: 13,
-    fontWeight: '600' as const,
+    fontWeight: "600" as const,
     color: colors.white,
   },
+  actionsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  retryButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: `${colors.white}`,
+    borderWidth: 1,
+    borderColor: colors.border,
+    justifyContent: "center",
+    alignItems: "center",
+  },
   completedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: `${colors.success}15`,
     paddingHorizontal: 10,
     paddingVertical: 6,
@@ -125,7 +187,23 @@ const styles = StyleSheet.create({
   },
   completedText: {
     fontSize: 12,
-    fontWeight: '600' as const,
+    fontWeight: "600" as const,
     color: colors.success,
+  },
+  askButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.white,
+  },
+  askButtonText: {
+    fontSize: 13,
+    fontWeight: "600" as const,
+    color: colors.primary,
   },
 });

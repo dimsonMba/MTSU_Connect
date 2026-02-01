@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -16,6 +16,7 @@ import { AIProgressOverlay } from "@/components/AIProgressOverlay";
 import { authService } from "@/services/auth.service";
 import { profileService } from "@/services/profile.service";
 import { chatService } from "@/services/chat.service";
+import { getMyDocuments } from "@/services/storage/documents/getMyDocuments";
 import {
   Search,
   Upload,
@@ -24,9 +25,17 @@ import {
   Sparkles,
   X,
   Users,
+  MessageCircle,
 } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
 import { useTheme } from "@/contexts/ThemeContext";
+import * as DocumentPicker from "expo-document-picker";
+import { createDocument } from "@/services/storage/documents/createDocument";
+import { uploadPdfToStorage } from "@/services/storage/uploadPdf";
+import { updateDocumentStorage } from "@/services/storage/documents/createDocument";
+import { generateFlashcards } from "@/services/rag/flashcards";
+import { ingestPdf } from "@/services/rag/ingestPdf";
+import { supabase } from "@/lib/supabase";
 
 type SearchMode = "pdfs" | "scholar";
 
@@ -36,11 +45,31 @@ export default function StudyScreen() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchMode, setSearchMode] = useState<SearchMode>("pdfs");
   const [isGenerating, setIsGenerating] = useState(false);
-  const [pdfs, setPdfs] = useState<any[]>([]);
+  const [generatingStage, setGeneratingStage] = useState<string | undefined>(
+    undefined,
+  );
+  const [pdfs, setPdfs] = useState<Array<any>>([]);
+  const [loadingDocs, setLoadingDocs] = useState(false);
   const [partners, setPartners] = useState<any[]>([]);
   const [creatingChat, setCreatingChat] = useState<string | null>(null);
 
-  React.useEffect(() => {
+  const refreshDocuments = async () => {
+    try {
+      setLoadingDocs(true);
+      const docs = await getMyDocuments();
+      setPdfs(docs);
+    } catch (err) {
+      console.warn("Failed to load documents", err);
+    } finally {
+      setLoadingDocs(false);
+    }
+  };
+
+  useEffect(() => {
+    refreshDocuments();
+  }, []);
+
+  useEffect(() => {
     const loadPartners = async () => {
       try {
         const { user } = await authService.getCurrentUser();
@@ -63,20 +92,145 @@ export default function StudyScreen() {
     loadPartners();
   }, []);
 
-  const handleGenerateFlashcards = (documentId: string) => {
+  const handleGenerateFlashcards = async (documentId: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setIsGenerating(true);
+    try {
+      setGeneratingStage("Ingesting PDF (if needed)...");
+      try {
+        await ingestPdf(documentId);
+      } catch (ingestErr) {
+        console.warn("ingestPdf failed during manual generate", ingestErr);
+      }
 
-    setTimeout(() => {
-      setIsGenerating(false);
+      setGeneratingStage("Generating flashcards...");
+      await generateFlashcards(documentId);
       setPdfs((prev) =>
         prev.map((pdf) =>
           pdf.id === documentId ? { ...pdf, hasFlashcards: true } : pdf,
         ),
       );
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert(
+        "Flashcards ready",
+        "Flashcards were generated successfully.",
+        [
+          {
+            text: "Open",
+            onPress: () => router.push(`/flashcards/${documentId}`),
+          },
+          { text: "Close", style: "cancel" },
+        ],
+      );
+    } catch (err) {
+      console.warn("Failed to generate flashcards", err);
+      Alert.alert("Generation failed", (err as any)?.message || String(err));
+    } finally {
+      setIsGenerating(false);
+      setGeneratingStage(undefined);
+    }
+  };
+
+  const handleUploadPdf = async () => {
+    try {
+      console.log("handleUploadPdf: start");
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      const { data: userRes } = await supabase.auth.getUser();
+      const user = userRes?.user;
+      if (!user || !user.id) {
+        Alert.alert(
+          "Not signed in",
+          "You must be signed in to upload documents.",
+        );
+        return;
+      }
+      const res = await DocumentPicker.getDocumentAsync({
+        type: "application/pdf",
+      });
+      console.log("DocumentPicker result:", res);
+
+      let pickedUri: string | undefined;
+      if (res && typeof res === "object") {
+        // @ts-ignore
+        if (
+          Array.isArray(res.assets) &&
+          res.assets.length > 0 &&
+          res.assets[0]?.uri
+        ) {
+          // @ts-ignore
+          pickedUri = res.assets[0].uri;
+        } else if ("type" in res) {
+          // @ts-ignore
+          if (res.type !== "success") {
+            Alert.alert("No file selected", "Please pick a PDF to upload.");
+            return;
+          }
+          // @ts-ignore
+          pickedUri = res.uri || res.fileUri || res.uri;
+        } else {
+          // @ts-ignore
+          pickedUri = res.uri || res.fileUri;
+        }
+      }
+
+      if (!pickedUri) {
+        Alert.alert(
+          "No file selected",
+          "Please pick a PDF to upload. (picker returned unexpected result)",
+        );
+        console.warn("DocumentPicker returned unexpected shape:", res);
+        return;
+      }
+
+      setIsGenerating(true);
+      setGeneratingStage("Creating document record...");
+      const title =
+        "name" in res && res.name
+          ? String(res.name).replace(/\.pdf$/i, "")
+          : "Untitled";
+      const { id: documentId, user_id } = await createDocument(title);
+
+      const uri = pickedUri as string;
+      console.log("Uploading file URI:", uri);
+      setGeneratingStage("Uploading PDF to storage...");
+      const uploadRes = await uploadPdfToStorage({
+        fileUri: uri,
+        documentId,
+        userId: user_id,
+      });
+      await updateDocumentStorage(documentId, uploadRes.bucket, uploadRes.path);
+
+      try {
+        setGeneratingStage("Ingesting PDF (extracting & embedding)...");
+        await ingestPdf(documentId);
+      } catch (ingestErr) {
+        console.warn("ingestPdf failed", ingestErr);
+      }
+
+      setGeneratingStage("Generating flashcards...");
+      await generateFlashcards(documentId);
+
+      await refreshDocuments();
+
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert(
+        "Upload complete",
+        uploadRes.signedUrl
+          ? "Signed URL created (valid 1h)"
+          : "Uploaded to storage",
+      );
       router.push(`/flashcards/${documentId}`);
-    }, 3000);
+    } catch (err: any) {
+      console.warn("Upload PDF failed", err);
+      Alert.alert("Upload failed", err?.message || String(err));
+    } finally {
+      setIsGenerating(false);
+      setGeneratingStage(undefined);
+    }
+  };
+
+  const handleAskDocument = (documentId: string) => {
+    router.push(`/ask/${documentId}` as any);
   };
 
   const handlePDFPress = (documentId: string) => {
@@ -115,9 +269,8 @@ export default function StudyScreen() {
   return (
     <View style={[styles.container, { backgroundColor: themeColors.background }]}>
       <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
       >
         <View style={[styles.searchContainer, { backgroundColor: themeColors.cardBackground }]}>
           <View style={[styles.searchBar, { backgroundColor: themeColors.background }]}>
@@ -188,12 +341,22 @@ export default function StudyScreen() {
         </View>
 
         <View style={styles.actionButtonsRow}>
-          <Pressable style={styles.actionButton}>
+          <Pressable
+            style={[styles.actionButton, styles.chatButton]}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              router.push("chats" as any);
+            }}
+          >
+            <MessageCircle size={20} color={colors.white} />
+            <Text style={styles.chatButtonText}>Messages</Text>
+          </Pressable>
+          <Pressable style={[styles.actionButton, styles.uploadButton]} onPress={handleUploadPdf}>
             <Upload size={20} color={colors.primary} />
             <Text style={styles.uploadText}>Upload PDF</Text>
           </Pressable>
         </View>
-
+        
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Your Documents</Text>
           <View style={styles.countBadge}>
@@ -209,7 +372,9 @@ export default function StudyScreen() {
               key={pdf.id}
               document={pdf}
               onGenerateFlashcards={() => handleGenerateFlashcards(pdf.id)}
+              onRetry={() => handleGenerateFlashcards(pdf.id)}
               onPress={() => handlePDFPress(pdf.id)}
+              onAsk={() => handleAskDocument(pdf.id)}
             />
           ))
         )}
@@ -241,7 +406,7 @@ export default function StudyScreen() {
 
       <AIProgressOverlay
         visible={isGenerating}
-        message="AI is analyzing your PDF..."
+        message={generatingStage ?? "AI is analyzing your PDF..."}
       />
     </View>
   );
@@ -250,10 +415,6 @@ export default function StudyScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
-  },
-  scrollView: {
-    flex: 1,
   },
   scrollContent: {
     padding: 20,
@@ -261,11 +422,14 @@ const styles = StyleSheet.create({
   },
   searchContainer: {
     marginBottom: 20,
+    backgroundColor: colors.white,
+    padding: 12,
+    borderRadius: 16,
   },
   searchBar: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: colors.white,
+    backgroundColor: colors.background,
     borderRadius: 14,
     paddingHorizontal: 16,
     height: 50,
@@ -281,7 +445,7 @@ const styles = StyleSheet.create({
   },
   searchToggle: {
     flexDirection: "row",
-    backgroundColor: colors.white,
+    backgroundColor: colors.background,
     borderRadius: 12,
     padding: 4,
     borderWidth: 1,
@@ -301,7 +465,7 @@ const styles = StyleSheet.create({
   },
   toggleText: {
     fontSize: 14,
-    fontWeight: "500" as const,
+    fontWeight: "500",
     color: colors.textSecondary,
   },
   toggleTextActive: {
@@ -321,32 +485,23 @@ const styles = StyleSheet.create({
     padding: 16,
     gap: 8,
   },
-  studentsButton: {
+  chatButton: {
     backgroundColor: colors.primary,
-    borderWidth: 2,
-    borderColor: colors.primary,
   },
-  studentsButtonText: {
+  chatButtonText: {
     fontSize: 16,
-    fontWeight: "600" as const,
+    fontWeight: "600",
     color: colors.white,
   },
   uploadButton: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
     backgroundColor: `${colors.primary}10`,
-    borderRadius: 14,
-    padding: 16,
-    gap: 8,
     borderWidth: 2,
     borderColor: colors.primary,
     borderStyle: "dashed",
   },
   uploadText: {
     fontSize: 16,
-    fontWeight: "600" as const,
+    fontWeight: "600",
     color: colors.primary,
   },
   sectionHeader: {
@@ -362,7 +517,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 20,
-    fontWeight: "700" as const,
+    fontWeight: "700",
     color: colors.text,
   },
   countBadge: {
@@ -374,7 +529,7 @@ const styles = StyleSheet.create({
   },
   countText: {
     fontSize: 13,
-    fontWeight: "600" as const,
+    fontWeight: "600",
     color: colors.white,
   },
   aiBadge: {
@@ -388,7 +543,7 @@ const styles = StyleSheet.create({
   },
   aiBadgeText: {
     fontSize: 11,
-    fontWeight: "600" as const,
+    fontWeight: "600",
     color: colors.primary,
   },
   emptyText: {

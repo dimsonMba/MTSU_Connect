@@ -7,7 +7,8 @@ export default function CareerLayout() {
       screenOptions={{
         headerStyle: { backgroundColor: colors.background },
         headerTintColor: colors.primary,
-        headerTitleStyle: { fontWeight: "600" as const },
+        headerTitleStyle: { fontWeight: "600" as const, fontSize: 20 },
+        headerTitleAlign: "center",
         headerShadowVisible: false,
       }}
     >
@@ -15,7 +16,7 @@ export default function CareerLayout() {
         name="index"
         options={{
           title: "Career Vault",
-          headerLargeTitle: true,
+          headerLargeTitle: false,
         }}
       />
     </Stack>

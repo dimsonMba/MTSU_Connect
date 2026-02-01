@@ -26,3 +26,9 @@ export async function uploadResumePdfToStorage(resumeFile: {
   if (error) throw error;
   return data.path;
 }
+
+// Default export to satisfy expo-router. This module is a helper, not a page.
+import React from "react";
+export default function _StorageLibRoute(): null {
+  return null;
+}
