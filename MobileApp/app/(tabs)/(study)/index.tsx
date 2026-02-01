@@ -8,6 +8,7 @@ import {
   Pressable,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { colors } from "@/constants/colors";
 import { PDFCard } from "@/components/PDFCard";
 import { StudyPartnerCard } from "@/components/StudyPartnerCard";
@@ -60,7 +61,8 @@ export default function StudyScreen() {
   );
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["top"]}>
+      <View style={styles.container}>
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
@@ -73,7 +75,7 @@ export default function StudyScreen() {
               style={styles.searchInput}
               placeholder={
                 searchMode === "pdfs"
-                  ? "Search your PDFs..."
+                  ? "Search yopur PDFs..."
                   : "Search Google Scholar..."
               }
               placeholderTextColor={colors.textMuted}
@@ -182,6 +184,8 @@ export default function StudyScreen() {
         message="AI is analyzing your PDF..."
       />
     </View>
+    </SafeAreaView>
+    
   );
 }
 
@@ -194,11 +198,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    padding: 20,
+    padding: 16,
     paddingBottom: 32,
+    gap: 16,
   },
   searchContainer: {
     marginBottom: 20,
+    paddingHorizontal: 16,
   },
   searchBar: {
     flexDirection: "row",
