@@ -366,11 +366,15 @@ serve(async (req: Request) => {
       }
     }
 
-    // Insert batches (avoid large payload limits)
+    // Insert batches (avoid large payload limits). Use upsert so overlapping
+    // ingestion attempts can't violate the unique (document_id, chunk_index)
+    // constraint; the latest chunk simply overwrites the previous value.
     const INSERT_BATCH = 200;
     for (let start = 0; start < rows.length; start += INSERT_BATCH) {
       const slice = rows.slice(start, start + INSERT_BATCH);
-      const { error } = await supabase.from("document_chunks").insert(slice);
+      const { error } = await supabase
+        .from("document_chunks")
+        .upsert(slice, { onConflict: "document_id,chunk_index" });
       if (error)
         return jsonResponse({ error: "DB insert failed", details: error }, 500);
     }
