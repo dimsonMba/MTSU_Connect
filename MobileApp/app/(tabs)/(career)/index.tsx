@@ -20,6 +20,10 @@ import {
 } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
 import * as DocumentPicker from "expo-document-picker";
+import { uploadResumePdfToStorage } from "../../lib/storage";
+import { extractResumeText } from "../../lib/api";
+
+
 
 
 type Step = "personal" | "education";
@@ -96,21 +100,43 @@ export default function CareerScreen() {
     setCurrentStep(step);
   };
 
-  const handleTailorWithAI = () => {
+  const handleTailorWithAI = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     if (!resumeFile) {
       setError("No PDF selected");
       return;
     }
-    
+    if (!jobDescription.trim()) {
+      setError?.("Paste a job description");
+      return;
+    }
+
     console.log("Tailoring resume with AI for job:", jobDescription);
     console.log("resumeData:", resumeData);
     console.log("resumeFile:", resumeFile);
 
+    try {
+      // 1) upload PDF
+      const resumePdfPath = await uploadResumePdfToStorage(resumeFile);
 
-    // Send to supabase -> supabase extracts text from resume -> ai implementation information
-    // return data
-    router.push("/resume-preview");
+      // 2) extract text server-side
+      const extractedText = await extractResumeText({
+        resumePdfPath,
+        jobDescription,
+        formData: resumeData,
+      });
+
+      console.log("Extracted text length:", extractedText.length);
+
+      // We wtill need to do the ai implementation with supabase edge functions here
+
+      // go to next screen
+      router.push("/resume-preview");
+    } catch (e: any) {
+      console.error(e);
+      setError?.(e.message ?? "Something went wrong");
+    }
+    
   };
 
 
