@@ -21,9 +21,10 @@ import {
 import * as Haptics from "expo-haptics";
 import * as DocumentPicker from "expo-document-picker";
 import { uploadResumePdfToStorage } from "../../lib/storage";
-import { extractResumeText } from "../../lib/api";
-
-
+import { extractResumeText, generateResumeJson } from "../../lib/api";
+import * as Print from "expo-print";
+import * as Sharing from "expo-sharing";
+import { setResumePreviewPayload } from "@/app/lib/resumePreviewStore";
 
 
 type Step = "personal" | "education";
@@ -71,9 +72,6 @@ export default function CareerScreen() {
     
   });
 
-  
-  
-
 
   const pickResumePdf = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -111,10 +109,7 @@ export default function CareerScreen() {
       return;
     }
 
-    console.log("Tailoring resume with AI for job:", jobDescription);
-    console.log("resumeData:", resumeData);
-    console.log("resumeFile:", resumeFile);
-
+  
     try {
       // 1) upload PDF
       const resumePdfPath = await uploadResumePdfToStorage(resumeFile);
@@ -126,7 +121,20 @@ export default function CareerScreen() {
         formData: resumeData,
       });
 
+      //console.log("Extracted text:", extractedText);
       console.log("Extracted text length:", extractedText.length);
+
+      const resume = await generateResumeJson({
+        resumeText: extractedText,
+        formData: resumeData,
+        jobDescription,
+      });
+
+      console.log("Generated HTML:", resume);
+
+      //const { uri } = await Print.printToFileAsync({ html }); // create PDF once here
+
+      setResumePreviewPayload({ resumeJson: resume});
 
       // We wtill need to do the ai implementation with supabase edge functions here
 
