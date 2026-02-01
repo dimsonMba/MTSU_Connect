@@ -4,7 +4,7 @@
     "slug": "mtsu-connect-plus",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/MT_Connect_Logo_.png",
     "scheme": "mtsuconnectplus",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -32,7 +32,7 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
+          "image": "./assets/images/MT_Connect_Logo_r.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff",
