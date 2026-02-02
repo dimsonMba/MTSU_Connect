@@ -12,23 +12,25 @@ interface StudyPartnerCardProps {
 export function StudyPartnerCard({ partner, onConnect }: StudyPartnerCardProps) {
   return (
     <View style={styles.card}>
-      <View style={styles.avatar}>
+      <Pressable style={styles.avatar} onPress={onConnect}>
         <User size={24} color={colors.primary} />
-      </View>
-      <View style={styles.content}>
-        <Text style={styles.name}>{partner.name}</Text>
-        <Text style={styles.major}>{partner.major || "Undeclared"}</Text>
-        {partner.sharedClasses !== undefined ? (
-          <View style={styles.statsRow}>
-            <View style={styles.stat}>
-              <BookOpen size={12} color={colors.textSecondary} />
-              <Text style={styles.statText}>
-                {partner.sharedClasses} shared classes
-              </Text>
+      </Pressable>
+      <Pressable style={styles.contentWrapper} onPress={onConnect}>
+        <View style={styles.content}>
+          <Text style={styles.name}>{partner.name}</Text>
+          <Text style={styles.major}>{partner.major || "Undeclared"}</Text>
+          {partner.sharedClasses !== undefined ? (
+            <View style={styles.statsRow}>
+              <View style={styles.stat}>
+                <BookOpen size={12} color={colors.textSecondary} />
+                <Text style={styles.statText}>
+                  {partner.sharedClasses} shared classes
+                </Text>
+              </View>
             </View>
-          </View>
-        ) : null}
-      </View>
+          ) : null}
+        </View>
+      </Pressable>
       {partner.matchScore !== undefined ? (
         <View style={styles.matchContainer}>
           <Text style={styles.matchScore}>{partner.matchScore}%</Text>
@@ -64,6 +66,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
+  },
+  contentWrapper: {
+    flex: 1,
   },
   content: {
     flex: 1,

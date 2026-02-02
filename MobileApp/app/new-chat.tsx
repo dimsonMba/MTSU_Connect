@@ -122,10 +122,19 @@ export default function NewChatScreen() {
     setCreatingChatId(student.id);
 
     const { data, error } = await chatService.createOrGetDirectMessage(student.id);
+    if (error || !data) {
+      setCreatingChatId(null);
+      console.error("Error creating chat:", error);
+      Alert.alert("Error", "Failed to start chat");
+      return;
+    }
+
+    const { error: joinError } = await chatService.joinConversation(data.id);
     setCreatingChatId(null);
 
-    if (error) {
-      console.error("Error creating chat:", error);
+    if (joinError) {
+      console.error("Error joining chat:", joinError);
+      Alert.alert("Error", "Failed to join conversation");
       return;
     }
 

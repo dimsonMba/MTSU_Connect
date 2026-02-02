@@ -93,8 +93,8 @@ export default function HomeScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     console.log("Quick action:", action);
     if (action === "chat") {
-      // Navigate to the list of conversations (Inbox)
-      router.push("/(tabs)/(study)/chats");
+      // Navigate to create a new chat
+      router.push("/new-chat");
     } else if (action === "upload") {
       router.push("/(tabs)/(study)");
     }
@@ -151,7 +151,7 @@ export default function HomeScreen() {
             <Text style={styles.avatarText}>
               {displayName
                 .split(" ")
-                .map((n) => n[0])
+                .map((n: string) => n[0])
                 .join("")}
             </Text>
           </View>

@@ -135,52 +135,75 @@ class ChatService {
 
   // Get participants in a conversation
   async getParticipants(conversationId: string): Promise<{ data: ChatParticipant[] | null; error: any }> {
-    const { data, error } = await supabase
+    const { data: participantRows, error } = await supabase
       .from("chat_participants")
-      .select(`
-        id,
-        user_id,
-        is_online,
-        last_seen,
-        profiles(full_name, avatar_url, major)
-      `)
+      .select("id, user_id, is_online, last_seen")
       .eq("conversation_id", conversationId);
 
     if (error) return { data: null, error };
 
-    const participants = data?.map((p: any) => ({
+    const userIds = Array.from(
+      new Set((participantRows || []).map((p: any) => p.user_id).filter(Boolean)),
+    );
+
+    const { data: profiles } = await supabase
+      .from("profiles")
+      .select("id, full_name, avatar_url, major")
+      .in("id", userIds.length ? userIds : ["00000000-0000-0000-0000-000000000000"]);
+
+    const profileById = new Map(
+      (profiles || []).map((p: any) => [
+        p.id,
+        { full_name: p.full_name, avatar_url: p.avatar_url, major: p.major },
+      ]),
+    );
+
+    const participants = (participantRows || []).map((p: any) => ({
       id: p.id,
       user_id: p.user_id,
       is_online: p.is_online,
       last_seen: p.last_seen,
-      profile: p.profiles || { full_name: "Unknown" },
-    })) || [];
+      profile: profileById.get(p.user_id) || { full_name: "Unknown" },
+    }));
 
     return { data: participants, error: null };
   }
 
   // Get messages for a conversation
   async getMessages(conversationId: string): Promise<{ data: ChatMessage[] | null; error: any }> {
-    const { data, error } = await supabase
+    const { data: messageRows, error } = await supabase
       .from("chat_messages")
-      .select(`
-        *,
-        profiles(full_name, avatar_url)
-      `)
+      .select("id, conversation_id, sender_id, content, created_at")
       .eq("conversation_id", conversationId)
       .order("created_at", { ascending: true });
 
     if (error) return { data: null, error };
 
-    const messages = data?.map((m: any) => ({
+    const senderIds = Array.from(
+      new Set((messageRows || []).map((m: any) => m.sender_id).filter(Boolean)),
+    );
+
+    const { data: profiles } = await supabase
+      .from("profiles")
+      .select("id, full_name, avatar_url")
+      .in("id", senderIds.length ? senderIds : ["00000000-0000-0000-0000-000000000000"]);
+
+    const profileById = new Map(
+      (profiles || []).map((p: any) => [
+        p.id,
+        { full_name: p.full_name, avatar_url: p.avatar_url },
+      ]),
+    );
+
+    const messages = (messageRows || []).map((m: any) => ({
       id: m.id,
       conversation_id: m.conversation_id,
       sender_id: m.sender_id,
       content: m.content,
       created_at: m.created_at,
-      sender_name: m.profiles?.full_name || "Unknown",
-      sender_avatar: m.profiles?.avatar_url,
-    })) || [];
+      sender_name: profileById.get(m.sender_id)?.full_name || "Unknown",
+      sender_avatar: profileById.get(m.sender_id)?.avatar_url,
+    }));
 
     return { data: messages, error: null };
   }
@@ -259,11 +282,11 @@ class ChatService {
 
     const { error } = await supabase
       .from("chat_participants")
-      .insert({
+      .upsert({
         conversation_id: conversationId,
         user_id: user.id,
         is_online: true,
-      });
+      }, { onConflict: "conversation_id,user_id" });
 
     return { error };
   }

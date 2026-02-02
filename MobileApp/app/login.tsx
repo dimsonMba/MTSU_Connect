@@ -25,6 +25,7 @@ import {
 } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
 import { useTheme } from "@/contexts/ThemeContext";
+import { Image } from 'expo-image';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -86,11 +87,7 @@ export default function LoginScreen() {
         >
           <View style={styles.header}>
             <View style={styles.logoCircle}>
-              <GraduationCap
-                size={32}
-                color={colors.primary}
-                strokeWidth={1.5}
-              />
+              <Image source={require('@/assets/images/MTConnectLogo.png')} style={styles1.logoImage}  />
             </View>
             <Text style={styles.title}>Welcome Back</Text>
             <Text style={styles.subtitle}>
@@ -217,7 +214,7 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: `${colors.primary}10`,
+    //backgroundColor: `${colors.primary}10`,
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 20,
@@ -339,5 +336,22 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "600" as const,
     color: colors.primary,
+  },
+});
+
+const styles1 = StyleSheet.create({
+  logoCircle: {
+    width: 80, 
+    height: 80,
+    borderRadius: 40, 
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden', 
+    backgroundColor: 'transparent', // Make background disappear
+  },
+  logoImage: {
+    width: 56,
+    height: 56,
+    resizeMode: 'contain', // Ensure the image doesn't stretch
   },
 });

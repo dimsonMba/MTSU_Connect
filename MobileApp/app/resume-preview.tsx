@@ -9,7 +9,7 @@ import * as Print from "expo-print";
 import { WebView } from "react-native-webview";
 import {
   getResumePreviewPayload,
-} from "../lib/resumePreviewStore";
+} from "@/lib/resumePreviewStore";
 
 export default function ResumePreviewScreen() {
   const router = useRouter();
