@@ -1,4 +1,4 @@
-import type { ResumeGenerated } from "../../types/index";
+import type { ResumeGenerated } from "../types/index";
 
 type ResumePreviewPayload = {
   resumeJson: ResumeGenerated;
