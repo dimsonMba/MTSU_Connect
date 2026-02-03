@@ -10,7 +10,7 @@ import {
 import { useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { colors } from "@/constants/colors";
-import { GraduationCap, ChevronRight } from "lucide-react-native";
+import { ChevronRight } from "lucide-react-native";
 import { Image } from 'expo-image';
 
 const { width } = Dimensions.get("window");
