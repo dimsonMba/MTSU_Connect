@@ -65,7 +65,7 @@ NEXT_PUBLIC_SUPABASE_URL=${SUPABASE_URL}
 
 ## Getting Started
 
-### 1. Backend preparation
+### 1. Backend preparation ( --------- Do not run this part. THe edge functions are in the supabase already. In case you needed it, reach out to @dimitrisinou@gmail.com) -----------
 
 1. **Run the schema**
    - Fast path: execute `Backend/supabase/migrations/COMPLETE_SETUP.sql` in the Supabase SQL editor.
@@ -81,6 +81,7 @@ NEXT_PUBLIC_SUPABASE_URL=${SUPABASE_URL}
    ```
 4. **Verify RLS** – Policies in the migrations restrict access to only the owning student; confirm Realtime is enabled for the chat tables if you want instant updates.
 
+--------------------------------------------- Continue here -------------------------------------
 ### 2. Mobile app setup
 
 ```bash
