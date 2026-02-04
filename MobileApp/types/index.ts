@@ -78,25 +78,52 @@ export interface ResumeData {
     gpa: string;
     graduationDate: string;
   };
-  experience: ExperienceItem[];
-  skills: string[];
 }
 
-export interface ExperienceItem {
-  id: string;
-  company: string;
-  position: string;
-  startDate: string;
-  endDate: string;
-  description: string;
-  current: boolean;
-}
 
 export interface StudyPartner {
   id: string;
   name: string;
   avatar?: string;
-  major: string;
-  sharedClasses: number;
-  matchScore: number;
+  major?: string;
+  sharedClasses?: number;
+  matchScore?: number;
 }
+
+export type ResumeGenerated = {
+  header: {
+    fullName: string;
+    email?: string; // "email • phone"
+    phone?: string; // "linkedin • github"
+    linkedin?: string;
+    github?: string;
+  };
+  summary?: string;
+
+  education: Array<{
+    school: string;
+    date?: string;
+    degree?: string;
+    major?: string;
+    gpa?: string; // "GPA: 4.0 • Dean’s List..."
+    bullets?: string[];
+  }>;
+
+  experience: Array<{
+    title: string;
+    date?: string;
+    companyLine?: string; // "Company, City, ST"
+    bullets: string[];
+  }>;
+
+  projects?: Array<{
+    title: string;
+    date?: string;
+    bullets: string[];
+  }>;
+
+  skills?: Array<{
+    category: string; // "Languages", "Frameworks", "Tools"
+    items: string;    // "Python, JS, ..."
+  }>;
+};

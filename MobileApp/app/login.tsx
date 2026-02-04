@@ -8,9 +8,12 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { authService } from "@/services/auth.service";
+import { profileService } from "@/services/profile.service";
 import { colors } from "@/constants/colors";
 import {
   GraduationCap,
@@ -21,21 +24,49 @@ import {
   ArrowRight,
 } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
+import { useTheme } from "@/contexts/ThemeContext";
+import { Image } from 'expo-image';
 
 export default function LoginScreen() {
   const router = useRouter();
+  const { colors: themeColors } = useTheme();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleLogin = async () => {
+    if (!email || !password) {
+      Alert.alert("Error", "Please fill in all fields");
+      return;
+    }
+
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setIsLoading(true);
-    setTimeout(() => {
+
+    try {
+      const { user, error } = await authService.signIn({ email, password });
+
+      if (error) {
+        Alert.alert("Login Failed", error.message);
+        setIsLoading(false);
+        return;
+      }
+
+      if (user) {
+        try {
+          const fullName = user.user_metadata?.full_name;
+          const updates = fullName ? { full_name: fullName } : {};
+          await profileService.updateProfile(user.id, updates);
+        } catch {
+          // Ignore profile upsert errors; user can still proceed.
+        }
+        router.replace("/(tabs)/(home)");
+      }
+    } catch (err) {
+      Alert.alert("Error", "An unexpected error occurred");
       setIsLoading(false);
-      router.replace("/(tabs)/(home)");
-    }, 1000);
+    }
   };
 
   const handleSSOLogin = (provider: string) => {
@@ -45,7 +76,7 @@ export default function LoginScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: themeColors.background }]}>
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={styles.keyboardView}
@@ -56,11 +87,7 @@ export default function LoginScreen() {
         >
           <View style={styles.header}>
             <View style={styles.logoCircle}>
-              <GraduationCap
-                size={32}
-                color={colors.primary}
-                strokeWidth={1.5}
-              />
+              <Image source={require('@/assets/images/MTConnectLogo.png')} style={styles1.logoImage}  />
             </View>
             <Text style={styles.title}>Welcome Back</Text>
             <Text style={styles.subtitle}>
@@ -187,7 +214,7 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: `${colors.primary}10`,
+    //backgroundColor: `${colors.primary}10`,
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 20,
@@ -309,5 +336,22 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "600" as const,
     color: colors.primary,
+  },
+});
+
+const styles1 = StyleSheet.create({
+  logoCircle: {
+    width: 80, 
+    height: 80,
+    borderRadius: 40, 
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden', 
+    backgroundColor: 'transparent', // Make background disappear
+  },
+  logoImage: {
+    width: 56,
+    height: 56,
+    resizeMode: 'contain', // Ensure the image doesn't stretch
   },
 });

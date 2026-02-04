@@ -49,6 +49,8 @@ export function PermitSelector({ selected, onSelect }: PermitSelectorProps) {
   );
 }
 
+export default PermitSelector;
+
 const styles = StyleSheet.create({
   container: {
     backgroundColor: colors.white,

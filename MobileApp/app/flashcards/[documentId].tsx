@@ -1,10 +1,18 @@
-import React, { useState } from "react";
-import { View, Text, StyleSheet, Pressable, Dimensions } from "react-native";
+import React, { useEffect, useState } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  Pressable,
+  Dimensions,
+  ActivityIndicator,
+} from "react-native";
 import { useLocalSearchParams, Stack, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { colors } from "@/constants/colors";
 import { FlashCard } from "@/components/FlashCard";
-import { mockFlashcards, mockPDFs } from "@/mocks/data";
+import { getFlashcards } from "@/services/rag/getFlashcards";
+import { getDocument } from "@/services/storage/documents/getDocument";
 import {
   RotateCcw,
   CheckCircle,
@@ -21,9 +29,42 @@ export default function FlashcardsScreen() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [correct, setCorrect] = useState(0);
   const [incorrect, setIncorrect] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [cards, setCards] = useState<
+    Array<{ id: string; question: string; answer: string }>
+  >([]);
+  const [document, setDocument] = useState<{
+    id: string;
+    title?: string;
+  } | null>(null);
 
-  const document = mockPDFs.find((p) => p.id === documentId);
-  const cards = mockFlashcards.filter((f) => f.documentId === documentId);
+  useEffect(() => {
+    let mounted = true;
+    async function load() {
+      try {
+        setLoading(true);
+        const doc = await getDocument(documentId as string);
+        const fetched = await getFlashcards(documentId as string);
+        if (!mounted) return;
+        setDocument(doc || null);
+        setCards(
+          fetched.map((f) => ({
+            id: f.id,
+            question: f.question,
+            answer: f.answer,
+          })),
+        );
+      } catch (err) {
+        console.warn("Failed to load flashcards", err);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    }
+    load();
+    return () => {
+      mounted = false;
+    };
+  }, [documentId]);
 
   const handleSwipeRight = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -46,6 +87,8 @@ export default function FlashcardsScreen() {
 
   const isComplete = currentIndex >= cards.length;
   const progress = cards.length > 0 ? (currentIndex / cards.length) * 100 : 0;
+  const visibleCards = cards.slice(currentIndex, currentIndex + 3);
+  const stackedCards = [...visibleCards].reverse();
 
   return (
     <SafeAreaView style={styles.container} edges={["bottom"]}>
@@ -87,7 +130,11 @@ export default function FlashcardsScreen() {
       </View>
 
       <View style={styles.cardsContainer}>
-        {isComplete ? (
+        {loading ? (
+          <ActivityIndicator size="large" color={colors.primary} />
+        ) : cards.length === 0 ? (
+          <Text style={styles.emptyText}>No flashcards yet</Text>
+        ) : isComplete ? (
           <View style={styles.completeContainer}>
             <View style={styles.completeIcon}>
               <CheckCircle size={64} color={colors.success} />
@@ -99,9 +146,7 @@ export default function FlashcardsScreen() {
 
             <View style={styles.scoreCard}>
               <View style={styles.scoreItem}>
-                <Text style={styles.scoreValue}>
-                  {Math.round((correct / cards.length) * 100)}%
-                </Text>
+                <Text style={styles.scoreValue}>{cards.length > 0 ? Math.round((correct / cards.length) * 100) : 0}%</Text>
                 <Text style={styles.scoreLabel}>Accuracy</Text>
               </View>
               <View style={styles.scoreDivider} />
@@ -127,34 +172,22 @@ export default function FlashcardsScreen() {
           </View>
         ) : (
           <>
-            {cards
-              .slice(currentIndex, currentIndex + 3)
-              .reverse()
-              .map((card, index) => (
-                <FlashCard
-                  key={card.id}
-                  question={card.question}
-                  answer={card.answer}
-                  onSwipeLeft={
-                    index ===
-                    cards.slice(currentIndex, currentIndex + 3).length - 1
-                      ? handleSwipeLeft
-                      : undefined
-                  }
-                  onSwipeRight={
-                    index ===
-                    cards.slice(currentIndex, currentIndex + 3).length - 1
-                      ? handleSwipeRight
-                      : undefined
-                  }
-                  cardIndex={index}
-                />
-              ))}
+            {stackedCards.map((card, index) => (
+              <FlashCard
+                key={card.id}
+                question={card.question}
+                answer={card.answer}
+                // Only the top-most card (index 0 after reversing) should react to swipes.
+                onSwipeLeft={index === 0 ? handleSwipeLeft : undefined}
+                onSwipeRight={index === 0 ? handleSwipeRight : undefined}
+                cardIndex={index}
+              />
+            ))}
           </>
         )}
       </View>
 
-      {!isComplete && (
+      {cards.length > 0 && !isComplete && (
         <View style={styles.hintContainer}>
           <View style={styles.hintRow}>
             <View
@@ -241,6 +274,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 20,
+  },
+  emptyText: {
+    fontSize: 14,
+    color: colors.textMuted,
+    textAlign: "center",
   },
   completeContainer: {
     alignItems: "center",

@@ -2,8 +2,12 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
+import { AppState } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { colors } from "@/constants/colors";
+import { studentService } from "@/services/student.service";
+import { authService } from "@/services/auth.service";
+import { ThemeProvider } from "@/contexts/ThemeContext";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -45,6 +49,14 @@ function RootLayoutNav() {
           presentation: "modal",
         }}
       />
+      <Stack.Screen
+        name="new-chat"
+        options={{
+          title: "New Message",
+          presentation: "modal",
+          headerShown: false,
+        }}
+      />
     </Stack>
   );
 }
@@ -54,11 +66,61 @@ export default function RootLayout() {
     SplashScreen.hideAsync();
   }, []);
 
+  useEffect(() => {
+    let isMounted = true;
+    let heartbeatId: ReturnType<typeof setInterval> | null = null;
+
+    const setPresence = async (isOnline: boolean) => {
+      if (!isMounted) return;
+      await studentService.updatePresence(isOnline);
+    };
+
+    const initPresence = async () => {
+      const { user } = await authService.getCurrentUser();
+      if (user) {
+        await setPresence(true);
+      }
+    };
+
+    initPresence();
+
+    const { data: { subscription: authSubscription } } = authService.onAuthStateChange((session) => {
+      if (!isMounted) return;
+      if (session?.user) {
+        setPresence(true);
+      } else {
+        setPresence(false);
+      }
+    });
+
+    heartbeatId = setInterval(() => {
+      setPresence(true);
+    }, 60 * 1000);
+
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") {
+        setPresence(true);
+      } else {
+        setPresence(false);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      if (heartbeatId) clearInterval(heartbeatId);
+      subscription.remove();
+      authSubscription.unsubscribe();
+      setPresence(false);
+    };
+  }, []);
+
   return (
-    <QueryClientProvider client={queryClient}>
-      <GestureHandlerRootView style={{ flex: 1 }}>
-        <RootLayoutNav />
-      </GestureHandlerRootView>
-    </QueryClientProvider>
+    <ThemeProvider>
+      <QueryClientProvider client={queryClient}>
+        <GestureHandlerRootView style={{ flex: 1 }}>
+          <RootLayoutNav />
+        </GestureHandlerRootView>
+      </QueryClientProvider>
+    </ThemeProvider>
   );
 }

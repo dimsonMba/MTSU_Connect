@@ -11,22 +11,25 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { colors } from "@/constants/colors";
-import { mockUser } from "@/mocks/data";
-import { ResumeData, ExperienceItem } from "@/types";
+import { ResumeData } from "@/types";
+import { authService } from "@/services/auth.service";
+import { profileService } from "@/services/profile.service";
 import {
   User,
-  Briefcase,
   GraduationCap,
-  Code,
   Sparkles,
-  ChevronRight,
-  Plus,
-  Trash2,
-  Eye,
 } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
+import * as DocumentPicker from "expo-document-picker";
+import { uploadResumePdfToStorage } from "@/lib/storage";
+import { extractResumeText, generateResumeJson } from "@/lib/api";
+import { useTheme } from "@/contexts/ThemeContext";
+import * as Print from "expo-print";
+import * as Sharing from "expo-sharing";
+import { setResumePreviewPayload } from "@/lib/resumePreviewStore";
 
-type Step = "personal" | "education" | "experience" | "skills";
+
+type Step = "personal" | "education";
 
 const steps: { id: Step; title: string; icon: React.ReactNode }[] = [
   {
@@ -39,26 +42,25 @@ const steps: { id: Step; title: string; icon: React.ReactNode }[] = [
     title: "Education",
     icon: <GraduationCap size={20} color={colors.white} />,
   },
-  {
-    id: "experience",
-    title: "Experience",
-    icon: <Briefcase size={20} color={colors.white} />,
-  },
-  {
-    id: "skills",
-    title: "Skills",
-    icon: <Code size={20} color={colors.white} />,
-  },
+  
 ];
 
 export default function CareerScreen() {
   const router = useRouter();
+  const { colors: themeColors } = useTheme();
   const [currentStep, setCurrentStep] = useState<Step>("personal");
   const [jobDescription, setJobDescription] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [resumeFile, setResumeFile] = useState<{
+    uri: string;
+    name: string;
+    mimeType: string;
+    size?: number;
+  } | null>(null);
   const [resumeData, setResumeData] = useState<ResumeData>({
     personalInfo: {
-      fullName: mockUser.name,
-      email: mockUser.email,
+      fullName: "",
+      email: "",
       phone: "",
       linkedin: "",
       portfolio: "",
@@ -66,93 +68,136 @@ export default function CareerScreen() {
     education: {
       school: "Middle Tennessee State University",
       degree: "Bachelor of Science",
-      major: mockUser.major,
-      gpa: mockUser.gpa.toString(),
+      major: "",
+      gpa: "",
       graduationDate: "May 2024",
     },
-    experience: [
-      {
-        id: "1",
-        company: "",
-        position: "",
-        startDate: "",
-        endDate: "",
-        description: "",
-        current: false,
-      },
-    ],
-    skills: ["Python", "JavaScript", "React", "SQL"],
+    
   });
+  const [resumeLoaded, setResumeLoaded] = useState(false);
+
+  React.useEffect(() => {
+    const loadProfile = async () => {
+      try {
+        const { user } = await authService.getCurrentUser();
+        if (!user || resumeLoaded) return;
+
+        const { profile, error } = await profileService.getProfile(user.id);
+        let resolvedProfile = profile;
+
+        if (error && error.code === "PGRST116") {
+          const { profile: newProfile } = await profileService.createProfile(user.id, {
+            full_name: user.user_metadata?.full_name || null,
+            email: user.email || "",
+          });
+          resolvedProfile = newProfile;
+        }
+
+        setResumeData((prev) => ({
+          ...prev,
+          personalInfo: {
+            ...prev.personalInfo,
+            fullName:
+              resolvedProfile?.full_name ||
+              user.user_metadata?.full_name ||
+              prev.personalInfo.fullName,
+            email: user.email || prev.personalInfo.email,
+          },
+          education: {
+            ...prev.education,
+            major: resolvedProfile?.major || prev.education.major,
+            gpa:
+              resolvedProfile?.gpa !== null && resolvedProfile?.gpa !== undefined
+                ? resolvedProfile.gpa.toFixed(2)
+                : prev.education.gpa,
+          },
+        }));
+        setResumeLoaded(true);
+      } catch (err) {
+        console.error("Error loading resume profile data:", err);
+      }
+    };
+
+    loadProfile();
+  }, [resumeLoaded]);
+
+
+  const pickResumePdf = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+    const result = await DocumentPicker.getDocumentAsync({
+      type: "application/pdf",
+      copyToCacheDirectory: true,
+      multiple: false,
+    });
+
+    if (result.canceled) return;
+
+    const file = result.assets[0];
+    setResumeFile({
+      uri: file.uri,
+      name: file.name ?? "resume.pdf",
+      mimeType: file.mimeType ?? "application/pdf",
+      size: file.size,
+    });
+  };
 
   const handleStepChange = (step: Step) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setCurrentStep(step);
   };
 
-  const handlePreview = () => {
+  const handleTailorWithAI = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    router.push("/resume-preview");
-  };
-
-  const handleTailorWithAI = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    console.log("Tailoring resume with AI for job:", jobDescription);
-  };
-
-  const addExperience = () => {
-    setResumeData((prev) => ({
-      ...prev,
-      experience: [
-        ...prev.experience,
-        {
-          id: Date.now().toString(),
-          company: "",
-          position: "",
-          startDate: "",
-          endDate: "",
-          description: "",
-          current: false,
-        },
-      ],
-    }));
-  };
-
-  const removeExperience = (id: string) => {
-    setResumeData((prev) => ({
-      ...prev,
-      experience: prev.experience.filter((exp) => exp.id !== id),
-    }));
-  };
-
-  const updateExperience = (
-    id: string,
-    field: keyof ExperienceItem,
-    value: string | boolean,
-  ) => {
-    setResumeData((prev) => ({
-      ...prev,
-      experience: prev.experience.map((exp) =>
-        exp.id === id ? { ...exp, [field]: value } : exp,
-      ),
-    }));
-  };
-
-  const addSkill = (skill: string) => {
-    if (skill.trim() && !resumeData.skills.includes(skill.trim())) {
-      setResumeData((prev) => ({
-        ...prev,
-        skills: [...prev.skills, skill.trim()],
-      }));
+    if (!resumeFile) {
+      setError("No PDF selected");
+      return;
     }
+    if (!jobDescription.trim()) {
+      setError?.("Paste a job description");
+      return;
+    }
+
+  
+    try {
+      // 1) upload PDF
+      const resumePdfPath = await uploadResumePdfToStorage(resumeFile);
+
+      // 2) extract text server-side
+      const extractedText = await extractResumeText({
+        resumePdfPath,
+        jobDescription,
+        formData: resumeData,
+      });
+
+      //console.log("Extracted text:", extractedText);
+      console.log("Extracted text length:", extractedText.length);
+
+      const resume = await generateResumeJson({
+        resumeText: extractedText,
+        formData: resumeData,
+        jobDescription,
+      });
+
+      console.log("Generated HTML:", resume);
+
+      //const { uri } = await Print.printToFileAsync({ html }); // create PDF once here
+
+      setResumePreviewPayload({ resumeJson: resume});
+
+      // We wtill need to do the ai implementation with supabase edge functions here
+
+      // go to next screen
+      router.push("/resume-preview");
+    } catch (e: any) {
+      console.error(e);
+      setError?.(e.message ?? "Something went wrong");
+    }
+    
   };
 
-  const removeSkill = (skill: string) => {
-    setResumeData((prev) => ({
-      ...prev,
-      skills: prev.skills.filter((s) => s !== skill),
-    }));
-  };
 
+  
   const renderStepContent = () => {
     switch (currentStep) {
       case "personal":
@@ -308,122 +353,7 @@ export default function CareerScreen() {
             </View>
           </View>
         );
-
-      case "experience":
-        return (
-          <View style={styles.formSection}>
-            {resumeData.experience.map((exp, index) => (
-              <View key={exp.id} style={styles.experienceCard}>
-                <View style={styles.experienceHeader}>
-                  <Text style={styles.experienceTitle}>
-                    Experience {index + 1}
-                  </Text>
-                  {resumeData.experience.length > 1 && (
-                    <Pressable onPress={() => removeExperience(exp.id)}>
-                      <Trash2 size={18} color={colors.error} />
-                    </Pressable>
-                  )}
-                </View>
-                <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>Company</Text>
-                  <TextInput
-                    style={styles.input}
-                    value={exp.company}
-                    onChangeText={(text) =>
-                      updateExperience(exp.id, "company", text)
-                    }
-                    placeholder="Tech Company Inc."
-                    placeholderTextColor={colors.textMuted}
-                  />
-                </View>
-                <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>Position</Text>
-                  <TextInput
-                    style={styles.input}
-                    value={exp.position}
-                    onChangeText={(text) =>
-                      updateExperience(exp.id, "position", text)
-                    }
-                    placeholder="Software Engineer Intern"
-                    placeholderTextColor={colors.textMuted}
-                  />
-                </View>
-                <View style={styles.inputRow}>
-                  <View style={[styles.inputGroup, { flex: 1 }]}>
-                    <Text style={styles.inputLabel}>Start Date</Text>
-                    <TextInput
-                      style={styles.input}
-                      value={exp.startDate}
-                      onChangeText={(text) =>
-                        updateExperience(exp.id, "startDate", text)
-                      }
-                      placeholder="Jun 2023"
-                      placeholderTextColor={colors.textMuted}
-                    />
-                  </View>
-                  <View
-                    style={[styles.inputGroup, { flex: 1, marginLeft: 12 }]}
-                  >
-                    <Text style={styles.inputLabel}>End Date</Text>
-                    <TextInput
-                      style={styles.input}
-                      value={exp.endDate}
-                      onChangeText={(text) =>
-                        updateExperience(exp.id, "endDate", text)
-                      }
-                      placeholder="Present"
-                      placeholderTextColor={colors.textMuted}
-                    />
-                  </View>
-                </View>
-                <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>Description</Text>
-                  <TextInput
-                    style={[styles.input, styles.textArea]}
-                    value={exp.description}
-                    onChangeText={(text) =>
-                      updateExperience(exp.id, "description", text)
-                    }
-                    placeholder="Describe your responsibilities and achievements..."
-                    placeholderTextColor={colors.textMuted}
-                    multiline
-                    numberOfLines={3}
-                  />
-                </View>
-              </View>
-            ))}
-            <Pressable style={styles.addButton} onPress={addExperience}>
-              <Plus size={18} color={colors.primary} />
-              <Text style={styles.addButtonText}>Add Experience</Text>
-            </Pressable>
-          </View>
-        );
-
-      case "skills":
-        return (
-          <View style={styles.formSection}>
-            <View style={styles.skillsContainer}>
-              {resumeData.skills.map((skill) => (
-                <View key={skill} style={styles.skillTag}>
-                  <Text style={styles.skillText}>{skill}</Text>
-                  <Pressable onPress={() => removeSkill(skill)}>
-                    <Trash2 size={14} color={colors.textSecondary} />
-                  </Pressable>
-                </View>
-              ))}
-            </View>
-            <View style={styles.addSkillContainer}>
-              <TextInput
-                style={[styles.input, { flex: 1 }]}
-                placeholder="Add a skill (e.g., TypeScript)"
-                placeholderTextColor={colors.textMuted}
-                onSubmitEditing={(e) => {
-                  addSkill(e.nativeEvent.text);
-                }}
-              />
-            </View>
-          </View>
-        );
+        
     }
   };
 
@@ -471,6 +401,22 @@ export default function CareerScreen() {
         </View>
 
         {renderStepContent()}
+        <View style={styles.formSection}>
+          <Text style={styles.inputLabel}>Upload Previous Resume (PDF)</Text>
+
+          <Pressable style={styles.uploadButton} onPress={pickResumePdf}>
+            <Text style={styles.uploadButtonText}>
+              {resumeFile ? "Change PDF" : "Choose PDF"}
+            </Text>
+          </Pressable>
+
+          {resumeFile && (
+            <Text style={styles.fileNameText}>
+              Selected: {resumeFile.name}
+            </Text>
+          )}
+        </View>
+
 
         <View style={styles.aiSection}>
           <View style={styles.aiHeader}>
@@ -501,13 +447,14 @@ export default function CareerScreen() {
             <Sparkles size={18} color={colors.white} />
             <Text style={styles.aiButtonText}>Optimize Resume</Text>
           </Pressable>
+          {error && (
+            <Text style={[styles.fileNameText, { textAlign: 'center' }]}>
+              Oops: {error}
+            </Text>
+          )}
         </View>
 
-        <Pressable style={styles.previewButton} onPress={handlePreview}>
-          <Eye size={20} color={colors.white} />
-          <Text style={styles.previewButtonText}>Preview Resume</Text>
-          <ChevronRight size={20} color={colors.white} />
-        </Pressable>
+        
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -698,6 +645,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: colors.text,
     paddingVertical: 16,
+    paddingLeft: 20,
     borderRadius: 14,
     gap: 8,
   },
@@ -708,4 +656,21 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: "center",
   },
+  uploadButton: {
+    backgroundColor: colors.primary,
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  uploadButtonText: {
+    color: colors.white,
+    fontSize: 16,
+    fontWeight: "600" as const,
+  },
+  fileNameText: {
+    marginTop: 10,
+    color: colors.textSecondary,
+    fontSize: 13,
+  },
+
 });
